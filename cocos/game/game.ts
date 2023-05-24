@@ -23,7 +23,7 @@
  THE SOFTWARE.
 */
 
-import { BUILD, DEBUG, EDITOR, HTML5, JSB, NATIVE, PREVIEW, RUNTIME_BASED, TEST, WEBGPU, TAOBAO } from 'internal:constants';
+import { BUILD, DEBUG, EDITOR, HTML5, JSB, NATIVE, PREVIEW, RUNTIME_BASED, TEST, WEBGPU, TAOBAO, NODEJS } from 'internal:constants';
 import { systemInfo } from 'pal/system-info';
 import { findCanvas, loadJsFile } from 'pal/env';
 import { Pacer } from 'pal/pacer';
@@ -846,8 +846,11 @@ export class Game extends EventTarget {
             .then(() => this._setupRenderPipeline())
             .then(() => this._loadPreloadAssets())
             .then(() => {
-                builtinResMgr.compileBuiltinMaterial();
-                return SplashScreen.instance.init();
+                if (!NODEJS) {
+                    builtinResMgr.compileBuiltinMaterial();
+                    return SplashScreen.instance.init();
+                }
+                return null;
             })
             .then(() => {
                 if (DEBUG) {
@@ -941,7 +944,7 @@ export class Game extends EventTarget {
     private _loadCCEScripts () {
         return new Promise<void>((resolve, reject) => {
             // Since there is no script in the bundle during preview, we need to load the user's script in the following way
-            if (PREVIEW && !TEST && !EDITOR && !NATIVE) {
+            if (PREVIEW && !TEST && !EDITOR && !NATIVE && !NODEJS) {
                 const bundneName = 'cce:/internal/x/prerequisite-imports';
                 import(bundneName).then(() => resolve(), (reason) => reject(reason));
             } else {
@@ -1005,7 +1008,7 @@ export class Game extends EventTarget {
 
     private _updateCallback () {
         if (!this._inited) return;
-        if (!SplashScreen.instance.isFinished) {
+        if (!NODEJS && !SplashScreen.instance.isFinished) {
             SplashScreen.instance.update(this._calculateDT(false));
         } else if (this._shouldLoadLaunchScene) {
             this._shouldLoadLaunchScene = false;

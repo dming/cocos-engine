@@ -22,37 +22,25 @@
  THE SOFTWARE.
 */
 
-export enum Platform {
-    UNKNOWN = 'UNKNOWN',
-    // NodeJs
-    NODEJS = 'NODEJS',
-    // Web Based
-    EDITOR_PAGE = 'EDITOR_PAGE',
-    EDITOR_CORE = 'EDITOR_CORE',
-    MOBILE_BROWSER = 'MOBILE_BROWSER',
-    DESKTOP_BROWSER = 'DESKTOP_BROWSER',
-    // Native
-    WIN32 = 'WIN32',
-    LINUX = 'LINUX',
-    ANDROID = 'ANDROID',
-    IOS = 'IOS',
-    MACOS = 'MACOS',
-    OHOS = 'OHOS',
-    OPENHARMONY = 'OPENHARMONY',
-    // Minigame
-    WECHAT_GAME = 'WECHAT_GAME',
-    WECHAT_MINI_PROGRAM = 'WECHAT_MINI_PROGRAM',
-    BAIDU_MINI_GAME = 'BAIDU_MINI_GAME',
-    XIAOMI_QUICK_GAME = 'XIAOMI_QUICK_GAME',
-    ALIPAY_MINI_GAME = 'ALIPAY_MINI_GAME',
-    TAOBAO_CREATIVE_APP = 'TAOBAO_CREATIVE_APP',
-    TAOBAO_MINI_GAME = 'TAOBAO_MINI_GAME',
-    BYTEDANCE_MINI_GAME = 'BYTEDANCE_MINI_GAME',
-    // Runtime Based
-    OPPO_MINI_GAME = 'OPPO_MINI_GAME',
-    VIVO_MINI_GAME = 'VIVO_MINI_GAME',
-    HUAWEI_QUICK_GAME = 'HUAWEI_QUICK_GAME',
-    COCOSPLAY = 'COCOSPLAY',
-    LINKSURE_MINI_GAME = 'LINKSURE_MINI_GAME',
-    QTT_MINI_GAME = 'QTT_MINI_GAME',
+import { TouchCallback } from 'pal/input';
+import { systemInfo } from 'pal/system-info';
+import { EventTarget } from '../../../cocos/core/event';
+import { InputEventType } from '../../../cocos/input/types/event-enum';
+import { Feature } from '../../system-info/enum-type';
+
+export class TouchInputSource {
+    private _eventTarget: EventTarget = new EventTarget();
+
+    constructor () {
+        if (systemInfo.hasFeature(Feature.INPUT_TOUCH)) {
+            this._registerEvent();
+        }
+    }
+
+    private _registerEvent () {
+    }
+
+    public on (eventType: InputEventType, callback: TouchCallback, target?: any) {
+        this._eventTarget.on(eventType, callback, target);
+    }
 }

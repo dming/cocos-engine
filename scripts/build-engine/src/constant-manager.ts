@@ -3,7 +3,7 @@ import ps from 'path';
 import { Config, IConstantConfig, IConstantInfo } from './config-interface';
 
 export type ModeType = 'EDITOR' | 'PREVIEW' | 'BUILD' | 'TEST';
-export type PlatformType = 'HTML5' | 'NATIVE' |
+export type PlatformType = 'NODEJS' | 'HTML5' | 'NATIVE' |
         'WECHAT' | 'BAIDU' | 'XIAOMI' | 'ALIPAY' | 'TAOBAO' | 'TAOBAO_MINIGAME' | 'BYTEDANCE' |
         'OPPO' | 'VIVO' | 'HUAWEI' | 'COCOSPLAY' | 'QTT' | 'LINKSURE';
 export type InternalFlagType = 'SERVER_MODE' | 'NOT_PACK_PHYSX_LIBS' | 'WEBGPU';
@@ -56,7 +56,7 @@ export class ConstantManager {
         if (config[platform]) {
             config[platform].value = true;
         } else {
-            console.warn(`Unknown platform: ${platform}`);
+            console.warn(`[exportDynamicConstants] Unknown platform: ${platform}`);
         }
         for (const key in flags) {
             const value = flags[key as FlagType]!;
@@ -147,7 +147,7 @@ export class ConstantManager {
         if (config[platform]) {
             config[platform].value = true;
         } else {
-            console.warn(`Unknown platform: ${platform}`);
+            console.warn(`[exportStaticConstants] Unknown platform: ${platform}`);
         }
         for (const key in flags) {
             const value = flags[key as FlagType]!;
@@ -299,7 +299,7 @@ export class ConstantManager {
         if (config[platform]) {
             config[platform].value = true;
         } else {
-            console.warn(`Unknown platform: ${platform}`);
+            console.warn(`[_applyOptionsToConfig] Unknown platform: ${platform}`);
         }
         for (const key in flags) {
             const value = flags[key as FlagType]!;

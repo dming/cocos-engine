@@ -22,7 +22,7 @@
  THE SOFTWARE.
 */
 
-import { EDITOR } from 'internal:constants';
+import { EDITOR, NODEJS } from 'internal:constants';
 
 /**
  * This method clones methods in minigame environment, sub as `wx`, `swan` etc. to a module called minigame.
@@ -191,17 +191,17 @@ export function versionCompare (versionA: string, versionB: string): number {
  * @param args The arguments to be passed to the callback function.
  * @returns A unique identifier for the timer.
  */
-export function setTimeoutRAF (callback: (...args: any[]) => void, delay: number, ...args: any[]): number {
+export function setTimeoutRAF (callback: (...args: any[]) => void, delay: number, ...args: any[]): number | NodeJS.Timeout {
     const start = performance.now();
 
-    const raf = requestAnimationFrame
+    const raf = NODEJS ? undefined : requestAnimationFrame
     || window.requestAnimationFrame
     || window.webkitRequestAnimationFrame
     || window.mozRequestAnimationFrame
     || window.oRequestAnimationFrame
     || window.msRequestAnimationFrame;
 
-    if (EDITOR || raf === undefined || globalThis.__globalXR?.isWebXR) {
+    if (NODEJS || EDITOR || raf === undefined || globalThis.__globalXR?.isWebXR) {
         return setTimeout(callback, delay, ...args);
     }
 

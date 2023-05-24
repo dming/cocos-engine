@@ -22,37 +22,30 @@
  THE SOFTWARE.
 */
 
-export enum Platform {
-    UNKNOWN = 'UNKNOWN',
-    // NodeJs
-    NODEJS = 'NODEJS',
-    // Web Based
-    EDITOR_PAGE = 'EDITOR_PAGE',
-    EDITOR_CORE = 'EDITOR_CORE',
-    MOBILE_BROWSER = 'MOBILE_BROWSER',
-    DESKTOP_BROWSER = 'DESKTOP_BROWSER',
-    // Native
-    WIN32 = 'WIN32',
-    LINUX = 'LINUX',
-    ANDROID = 'ANDROID',
-    IOS = 'IOS',
-    MACOS = 'MACOS',
-    OHOS = 'OHOS',
-    OPENHARMONY = 'OPENHARMONY',
-    // Minigame
-    WECHAT_GAME = 'WECHAT_GAME',
-    WECHAT_MINI_PROGRAM = 'WECHAT_MINI_PROGRAM',
-    BAIDU_MINI_GAME = 'BAIDU_MINI_GAME',
-    XIAOMI_QUICK_GAME = 'XIAOMI_QUICK_GAME',
-    ALIPAY_MINI_GAME = 'ALIPAY_MINI_GAME',
-    TAOBAO_CREATIVE_APP = 'TAOBAO_CREATIVE_APP',
-    TAOBAO_MINI_GAME = 'TAOBAO_MINI_GAME',
-    BYTEDANCE_MINI_GAME = 'BYTEDANCE_MINI_GAME',
-    // Runtime Based
-    OPPO_MINI_GAME = 'OPPO_MINI_GAME',
-    VIVO_MINI_GAME = 'VIVO_MINI_GAME',
-    HUAWEI_QUICK_GAME = 'HUAWEI_QUICK_GAME',
-    COCOSPLAY = 'COCOSPLAY',
-    LINKSURE_MINI_GAME = 'LINKSURE_MINI_GAME',
-    QTT_MINI_GAME = 'QTT_MINI_GAME',
+import type * as NodeJsPath from 'path';
+
+declare const NodePath: NodeJsPath.PlatformPath;
+
+declare const require: (path: string) =>  Promise<void>;
+
+export function findCanvas (): { frame: HTMLDivElement, container: HTMLDivElement, canvas: HTMLCanvasElement } {
+    const frame = undefined as any as HTMLDivElement;
+    const container = undefined as any as HTMLDivElement;
+    const canvas = undefined as any as HTMLCanvasElement;
+
+    return { frame, container, canvas };
 }
+
+export function loadJsFile (path: string): Promise<void> {
+    const fullPath = NodePath.resolve(path);
+    console.log('require fullPath=', fullPath);
+    // eslint-disable-next-line import/no-dynamic-require
+    return require(`${fullPath}`);
+}
+
+// export function loadJsFile (path: string): Promise<void> {
+//     // const fullPath = NodePath.resolve(path);
+//     // console.log('fullPath=', fullPath);
+//     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+//     return import(`../${path}`);
+// }

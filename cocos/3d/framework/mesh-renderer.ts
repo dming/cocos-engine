@@ -22,7 +22,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
 */
-import { JSB } from 'internal:constants';
+import { JSB, NODEJS } from 'internal:constants';
 import { displayOrder, group, range } from 'cc.decorator';
 import { Texture2D, TextureCube } from '../../asset/assets';
 import { Material } from '../../asset/assets/material';
@@ -815,6 +815,11 @@ export class MeshRenderer extends ModelRenderer {
     }
 
     protected _updateModels () {
+        if (NODEJS) {
+            console.log('nodejs not support \'Mesh/MeshRenderer._updateModels\'');
+            // TODO: 其实应该只创建mesh，而不管material的
+            return;
+        }
         if (!this.enabledInHierarchy) {
             return;
         }

@@ -26,6 +26,7 @@
 import {
     ccclass, executeInEditMode, executionOrder, help, menu, tooltip, type,
 } from 'cc.decorator';
+import { NODEJS } from 'internal:constants';
 import type { AnimationClip } from '../../animation/animation-clip';
 import { Material } from '../../asset/assets';
 import { Skeleton } from '../assets/skeleton';
@@ -102,6 +103,10 @@ export class SkinnedMeshRenderer extends MeshRenderer {
     }
 
     public onLoad () {
+        if (NODEJS) {
+            console.log('nodejs not support \'Mesh/SkinnedMeshRenderer\'');
+            return;
+        }
         super.onLoad();
         this._tryBindAnimation();
     }

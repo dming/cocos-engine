@@ -23,6 +23,7 @@
 */
 
 import { ccclass, serializable, type } from 'cc.decorator';
+import { NODEJS } from 'internal:constants';
 import { Asset } from './asset';
 import { EffectAsset } from './effect-asset';
 import { Texture, Type } from '../../gfx';
@@ -412,6 +413,10 @@ export class Material extends Asset {
      * @engineInternal
      */
     protected _createPasses () {
+        if (NODEJS) {
+            console.log('nodejs not support \'cc.Material._createPasses\'');
+            return [];
+        }
         const tech = this._effectAsset!.techniques[this._techIdx || 0];
         if (!tech) { return []; }
         const passNum = tech.passes.length;

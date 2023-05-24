@@ -22,6 +22,8 @@
  THE SOFTWARE.
 */
 
+import { NODEJS } from 'internal:constants';
+import { loadJsFile } from 'pal/env';
 import { getError } from '../../core';
 import { ccwindow } from '../../core/global-exports';
 
@@ -36,6 +38,13 @@ export default function downloadScript (
 ): HTMLScriptElement | null {
     // no need to load script again
     if (downloaded[url]) {
+        if (onComplete) { onComplete(null); }
+        return null;
+    }
+
+    if (NODEJS) {
+        const js = loadJsFile(url);
+        downloaded[url] = true;
         if (onComplete) { onComplete(null); }
         return null;
     }
