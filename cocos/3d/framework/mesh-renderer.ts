@@ -22,7 +22,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
 */
-import { JSB } from 'internal:constants';
+import { JSB, NODEJS } from 'internal:constants';
 import { displayName, displayOrder, group, range } from 'cc.decorator';
 import { Texture2D, TextureCube } from '../../asset/assets';
 import { Material } from '../../asset/assets/material';
@@ -879,6 +879,11 @@ export class MeshRenderer extends ModelRenderer {
     }
 
     protected _updateModels () {
+        if (NODEJS) {
+            console.log('nodejs not support \'Mesh/MeshRenderer._updateModels\'');
+            // TODO: 其实应该只创建mesh，而不管material的
+            return;
+        }
         if (!this.enabledInHierarchy) {
             return;
         }
@@ -965,7 +970,12 @@ export class MeshRenderer extends ModelRenderer {
         if (this._model.scene !== null) {
             this._detachFromScene();
         }
-        renderScene.addModel(this._model);
+
+        if (this.isUseGPUScene()) {
+            renderScene.addGPUModel(this._model);
+        } else {
+            renderScene.addModel(this._model);
+        }
     }
 
     /**
@@ -973,8 +983,30 @@ export class MeshRenderer extends ModelRenderer {
      */
     public _detachFromScene () {
         if (this._model && this._model.scene) {
-            this._model.scene.removeModel(this._model);
+            if (this.isUseGPUScene()) {
+                this._model.scene.removeGPUModel(this._model);
+            } else {
+                this._model.scene.removeModel(this._model);
+            }
         }
+    }
+
+    /**
+     * @engineInternal
+     */
+    public isUseGPUScene () {
+        const sceneData = cclegacy.director.root.pipeline.pipelineSceneData;
+        if (!sceneData || !sceneData.isGPUDrivenEnabled()) {
+            return false;
+        }
+
+        if (!this._mesh || !this.node) {
+            return false;
+        }
+
+        const useLightProbe = this.node.mobility === MobilityMode.Movable && this.bakeSettings.useLightProbe;
+        const useReflectionProbe = this.bakeSettings.reflectionProbe !== ReflectionProbeType.NONE;
+        return this.mesh!.canUseGPUScene() && !useLightProbe && !useReflectionProbe;
     }
 
     protected _updateModelParams () {

@@ -39,12 +39,78 @@ gulp.task('build-debug-infos', async () => {
 });
 
 gulp.task('build-source', async () => {
-    const cli = require.resolve('@cocos/build-engine/dist/cli');
+    const cli = require.resolve('./scripts/build-engine/dist/cli');
+    const outDir = ps.join('bin', 'dev', 'cc-source');
+    await fs.ensureDir(outDir);
+    await fs.emptyDir(outDir);
+    const features = [
+        "2d",
+        "3d",
+        "animation",
+        "base",
+        "gfx-webgl",
+        "gfx-webgl2",
+        "light-probe",
+        "marionette",
+        "primitive",
+        "profiler",
+        "skeletal-animation",
+        "tween",
+        "ui",
+        "gfx-empty",
+    ].reduce((pre, cur) => {
+        return pre += "--features=" + cur + " ";
+    }, "");
+    console.log("features is ", features);
     return cp.spawn('node', [
         cli,
         `--engine=${__dirname}`,
         '--module=system',
-        ...process.argv.slice(3),
+        '--build-mode=BUILD',
+        '--platform=HTML5',
+        '--split=false',
+        features,
+        `--out=${outDir}`,
+        // ...process.argv.slice(3),
+    ], {
+        shell: true,
+        stdio: 'inherit',
+        cwd: __dirname,
+    });
+});
+
+gulp.task('build-nodejs', async () => {
+    const cli = require.resolve('./scripts/build-engine/dist/cli');
+    const outDir = ps.join('bin', 'dev', 'cc-nodejs');
+    await fs.ensureDir(outDir);
+    await fs.emptyDir(outDir);
+    const features = [
+        "2d",
+        "3d",
+        "animation",
+        "base",
+        "light-probe",
+        "marionette",
+        "primitive",
+        "profiler",
+        "skeletal-animation",
+        "tween",
+        "ui",
+        "gfx-empty",
+    ].reduce((pre, cur) => {
+        return pre += "--features=" + cur + " ";
+    }, "");
+    console.log("features is ", features);
+    return cp.spawn('node', [
+        cli,
+        `--engine=${__dirname}`,
+        '--module=system',
+        '--build-mode=BUILD',
+        '--platform=NODEJS',
+        '--split=false',
+        features,
+        `--out=${outDir}`,
+        // ...process.argv.slice(3),
     ], {
         shell: true,
         stdio: 'inherit',

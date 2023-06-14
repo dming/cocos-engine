@@ -22,6 +22,8 @@
  THE SOFTWARE.
 */
 
+import { NODEJS } from 'internal:constants';
+
 type FileProgressCallback = (loaded: number, total: number) => void;
 
 export default function downloadFile (
@@ -29,7 +31,11 @@ export default function downloadFile (
     options: Record<string, any>,
     onProgress: FileProgressCallback | null | undefined,
     onComplete: ((err: Error | null, data?: any | null) => void),
-): XMLHttpRequest {
+): XMLHttpRequest | undefined {
+    if (NODEJS && !url.startsWith('http')) {
+        return downloadNodejsLocalFile(url, options, onProgress, onComplete);
+    }
+
     const xhr = new XMLHttpRequest();
     const errInfo = `download failed: ${url}, status: `;
 
@@ -75,4 +81,28 @@ export default function downloadFile (
     xhr.send(null);
 
     return xhr;
+}
+
+declare const fsUtils: any;
+function downloadNodejsLocalFile (
+    url: string,
+    options: Record<string, any>,
+    onProgress: FileProgressCallback | null | undefined,
+    onComplete: ((err: Error | null, data?: any | null) => void),
+): undefined {
+    const responseType = options.xhrResponseType || 'text';
+    switch (responseType) {
+    case 'arraybuffer':
+    case 'blob':
+        fsUtils.readArrayBuffer(url, onComplete);
+        break;
+    case 'json':
+        fsUtils.readJson(url, onComplete);
+        break;
+    case 'text':
+    default:
+        fsUtils.readText(url, onComplete);
+        break;
+    }
+    return undefined;
 }

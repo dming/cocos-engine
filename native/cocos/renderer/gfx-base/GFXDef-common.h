@@ -475,6 +475,7 @@ enum class TextureFlagBit : uint32_t {
     GENERAL_LAYOUT = 0x2,  // For inout framebuffer attachments
     EXTERNAL_OES = 0x4,    // External oes texture
     EXTERNAL_NORMAL = 0x8, // External normal texture
+    MUTABLE_STORAGE = 0x10, // Texture is mutable or not, default is immutable(only for webgl2)
 };
 using TextureFlags = TextureFlagBit;
 CC_ENUM_BITWISE_OPERATORS(TextureFlagBit);
@@ -845,6 +846,7 @@ struct DeviceCaps {
     bool supportQuery{false};
     bool supportVariableRateShading{false};
     bool supportSubPassShading{false};
+    bool supportMultiDrawIndirect{false};
 
     float clipSpaceMinZ{-1.F};
     float screenSpaceSignY{1.F};
@@ -900,6 +902,14 @@ struct TextureSubresRange {
     uint32_t layerCount{1};
 
     EXPOSE_COPY_FN(TextureSubresRange)
+};
+
+struct BufferCopy {
+    uint32_t srcOffset{0};
+    uint32_t dstOffset{0};
+    uint32_t size{0};
+
+    EXPOSE_COPY_FN(BufferCopy)
 };
 
 struct TextureCopy {
@@ -1020,6 +1030,21 @@ struct BufferViewInfo {
     uint32_t range{0};
 
     EXPOSE_COPY_FN(BufferViewInfo)
+};
+
+struct DrawIndirectCommand {
+    uint32_t vertexCount;
+    uint32_t instanceCount;
+    uint32_t firstVertex;
+    uint32_t firstInstance;
+};
+
+struct DrawIndexedIndirectCommand {
+    uint32_t indexCount;
+    uint32_t instanceCount;
+    uint32_t firstIndex;
+    int32_t vertexOffset;
+    uint32_t firstInstance;
 };
 
 struct DrawInfo {
@@ -1265,7 +1290,6 @@ struct InputAssemblerInfo {
     AttributeList attributes;
     BufferList vertexBuffers;
     Buffer *indexBuffer{nullptr};    // @ts-nullable
-    Buffer *indirectBuffer{nullptr}; // @ts-nullable
 
     EXPOSE_COPY_FN(InputAssemblerInfo)
 };

@@ -1,7 +1,7 @@
 {
     "files.exclude": {
         ".git": true,
-        "node_modules": true,
+        // "node_modules": true,
     },
     "search.exclude": {
         ".git": true,
@@ -22,4 +22,5 @@
         "iterator": "cpp"
     },
     "cmake.configureOnOpen": false,
+    "cmake.sourceDirectory": "E:/github/cocos-engine/native/external/mac",
 }

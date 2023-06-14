@@ -22,7 +22,7 @@
  THE SOFTWARE.
 */
 
-import { BUILD, EDITOR, EDITOR_NOT_IN_PREVIEW } from 'internal:constants';
+import { BUILD, EDITOR, EDITOR_NOT_IN_PREVIEW, NODEJS } from 'internal:constants';
 import { sys, js, misc, path, cclegacy } from '../../core';
 import Cache from './cache';
 import downloadDomImage from './download-dom-image';
@@ -48,7 +48,7 @@ const REGEX = /^(?:\w+:\/\/|\.+\/).+/;
 
 const downloadImage = (url: string, options: Record<string, any>, onComplete: ((err: Error | null, data?: any | null) => void)) => {
     // if createImageBitmap is valid, we can transform blob to ImageBitmap. Otherwise, just use HTMLImageElement to load
-    const func = sys.hasFeature(sys.Feature.IMAGE_BITMAP) && cclegacy.assetManager.allowImageBitmap ? downloadBlob : downloadDomImage;
+    const func = (NODEJS || (sys.hasFeature(sys.Feature.IMAGE_BITMAP) && cclegacy.assetManager.allowImageBitmap)) ? downloadBlob : downloadDomImage;
     func(url, options, onComplete);
 };
 

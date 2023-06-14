@@ -23,7 +23,7 @@
  THE SOFTWARE.
 */
 
-import { EDITOR } from 'internal:constants';
+import { EDITOR, NODEJS } from 'internal:constants';
 import { ccclass, help, executeInEditMode, menu, tooltip, displayOrder, type, serializable, visible, range, rangeMin } from 'cc.decorator';
 import { RenderTexture } from '../asset/assets/render-texture';
 import { UITransform } from '../2d/framework';
@@ -576,6 +576,10 @@ export class Camera extends Component {
     }
 
     public onLoad () {
+        if (NODEJS) {
+            console.log('nodejs not support \'cc.Camera.onLoad\'');
+            return;
+        }
         this._createCamera();
     }
 

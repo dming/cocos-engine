@@ -24,6 +24,8 @@
 
 export enum Platform {
     UNKNOWN = 'UNKNOWN',
+    // NodeJs
+    NODEJS = 'NODEJS',
     // Web Based
     EDITOR_PAGE = 'EDITOR_PAGE',
     EDITOR_CORE = 'EDITOR_CORE',
@@ -31,6 +33,7 @@ export enum Platform {
     DESKTOP_BROWSER = 'DESKTOP_BROWSER',
     // Native
     WIN32 = 'WIN32',
+    LINUX = 'LINUX',
     ANDROID = 'ANDROID',
     IOS = 'IOS',
     MACOS = 'MACOS',

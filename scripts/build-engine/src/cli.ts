@@ -106,7 +106,7 @@ async function main () {
         type: 'string',
         description: 'Meta out file.',
     });
-
+    console.log(">>> yargs.argv is :%j", yargs.argv);
     const flags: Record<string, boolean> = {};
     const argvFlags = yargs.argv.flags as (string[] | undefined);
     if (argvFlags) {
@@ -122,13 +122,13 @@ async function main () {
         platform: yargs.argv.platform as PlatformType,
         flags,
     });
-
+    console.log("dming buildTimeConstants is %j", buildTimeConstants);
     const noDeprecatedFeatures = yargs.argv.noDeprecatedFeatures as (boolean | string | undefined);
 
     const options: build.Options = {
         engine: engineRoot,
         split: yargs.argv.split as boolean,
-        features: yargs.argv._ as (string[] | undefined) ?? [],
+        features: yargs.argv.features as (string[] | undefined) ?? [],
         compress: yargs.argv.compress as (boolean | undefined),
         out: yargs.argv.out as string,
         sourceMap,

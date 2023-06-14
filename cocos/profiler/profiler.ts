@@ -23,7 +23,7 @@
  THE SOFTWARE.
 */
 
-import { TEST, EDITOR } from 'internal:constants';
+import { TEST, EDITOR, NODEJS } from 'internal:constants';
 import { MeshRenderer } from '../3d/framework/mesh-renderer';
 import { createMesh } from '../3d/misc';
 import { Material } from '../asset/assets/material';
@@ -128,7 +128,7 @@ export class Profiler extends System {
 
     constructor () {
         super();
-        if (!TEST) {
+        if (!TEST && !NODEJS) {
             this._canvas = ccwindow.document.createElement('canvas');
             this._ctx = this._canvas.getContext('2d')!;
             this._canvasArr.push(this._canvas);
@@ -136,7 +136,7 @@ export class Profiler extends System {
     }
 
     init () {
-        const showFPS = !!settings.querySettings(Settings.Category.PROFILING, 'showFPS');
+        const showFPS = !NODEJS && !!settings.querySettings(Settings.Category.PROFILING, 'showFPS');
         if (showFPS) {
             this.showStats();
         } else {

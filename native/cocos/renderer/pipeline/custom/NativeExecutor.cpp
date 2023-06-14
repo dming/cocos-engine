@@ -46,6 +46,7 @@
 #include "cocos/scene/Octree.h"
 #include "cocos/scene/Pass.h"
 #include "cocos/scene/RenderScene.h"
+#include "cocos/scene/gpu-scene/GPUScene.h"
 #include "cocos/scene/Skybox.h"
 #include "details/GraphView.h"
 #include "details/GslUtils.h"
@@ -1414,10 +1415,23 @@ struct RenderGraphVisitor : boost::dfs_visitor<> {
         const CopyPair& copy,
         ResourceGraph::vertex_descriptor srcID,
         ResourceGraph::vertex_descriptor dstID) const {
-        // TODO(zhouzhenglong): add impl
-        std::ignore = copy;
-        std::ignore = srcID;
-        std::ignore = dstID;
+        auto& resg = ctx.resourceGraph;
+        std::vector<gfx::BufferCopy> copyInfos(1, gfx::BufferCopy{});
+
+        gfx::Buffer* srcBuffer = resg.getBuffer(srcID);
+        gfx::Buffer* dstBuffer = resg.getBuffer(dstID);
+        CC_ENSURES(srcBuffer);
+        CC_ENSURES(dstBuffer);
+        if (!srcBuffer || !dstBuffer) {
+            return;
+        }
+
+        auto& copyInfo = copyInfos[0];
+        copyInfo.srcOffset = copy.sourceOffset;
+        copyInfo.dstOffset = copy.targetOffset;
+        copyInfo.size = copy.bufferSize;
+
+        ctx.cmdBuff->copyBuffer(srcBuffer, dstBuffer, copyInfos.data(), 1);
     }
     void uploadTexture( // NOLINT(readability-convert-member-functions-to-static)
         const UploadPair& upload,
@@ -1536,6 +1550,7 @@ struct RenderGraphVisitor : boost::dfs_visitor<> {
                 queue.opaqueInstancingQueue.recordCommandBuffer(
                     ctx.currentPass, ctx.cmdBuff);
             }
+            RenderBatchingQueue::recordCommandBuffer(ctx.device, camera, ctx.currentPass, ctx.cmdBuff, queue.sceneFlags);
         }
         if (bDrawBlend) {
             queue.transparentQueue.recordCommandBuffer(
@@ -1544,6 +1559,8 @@ struct RenderGraphVisitor : boost::dfs_visitor<> {
                 queue.transparentInstancingQueue.recordCommandBuffer(
                     ctx.currentPass, ctx.cmdBuff);
             }
+			// Stanley TODO
+            //queue.transparentBatchingQueue.recordCommandBuffer(ctx.device, camera, ctx.currentPass, ctx.cmdBuff, queue.sceneFlags);
         }
         if (any(sceneData.flags & SceneFlags::UI)) {
             submitUICommands(ctx.currentPass,
@@ -2142,13 +2159,23 @@ void NativePipeline::executeRenderGraph(const RenderGraph& rg) {
     }
 
     // gpu driven
-    if constexpr (ENABLE_GPU_DRIVEN) {
-        // TODO(jilin): consider populating renderSceneResources here
-        const scene::RenderScene* const ptr = nullptr;
-        auto& sceneResource = ppl.nativeContext.renderSceneResources[ptr];
-        const auto& nameID = lg.attributeIndex.find("cc_xxxDescriptor")->second;
-        sceneResource.resourceIndex.emplace(nameID, ResourceType::STORAGE_BUFFER);
-        sceneResource.storageBuffers.emplace(nameID, nullptr);
+    for (const auto& [scene, queries] : ppl.nativeContext.sceneCulling.sceneQueries) {
+        auto* gpuScene = scene->getGPUScene();
+
+        gfx::Buffer* defaultBuffer = nullptr;
+        const auto* pipeline = Root::getInstance()->getPipeline();
+        if (pipeline && pipeline->getPipelineSceneData()) {
+            defaultBuffer = pipeline->getPipelineSceneData()->getDefaultBuffer();
+        }
+
+        auto& sceneResource = ppl.nativeContext.renderSceneResources[scene];
+        const auto& objectBufferID = lg.attributeIndex.find("cc_objectBuffer")->second;
+        sceneResource.resourceIndex.emplace(objectBufferID, ResourceType::STORAGE_BUFFER);
+        sceneResource.storageBuffers.emplace(objectBufferID, gpuScene ? gpuScene->getObjectBuffer() : defaultBuffer);
+
+        const auto& instanceBufferID = lg.attributeIndex.find("cc_instanceBuffer")->second;
+        sceneResource.resourceIndex.emplace(instanceBufferID, ResourceType::STORAGE_BUFFER);
+        sceneResource.storageBuffers.emplace(instanceBufferID, gpuScene ? gpuScene->getInstanceBuffer() : defaultBuffer);
     }
 
     // Execute all valid passes

@@ -23,7 +23,7 @@
 */
 
 import { ccclass, serializable, editable } from 'cc.decorator';
-import { EDITOR, TEST } from 'internal:constants';
+import { EDITOR, NODEJS, TEST } from 'internal:constants';
 import { CCObject } from '../core/data/object';
 import { assert, getError } from '../core/platform/debug';
 import { RenderScene } from '../render-scene/core/render-scene';
@@ -191,7 +191,7 @@ export class Scene extends Node {
         }
         legacyCC.director._nodeActivator.activateNode(this, active);
         // The test environment does not currently support the renderer
-        if (!TEST) {
+        if (!TEST && !NODEJS) {
             this._globals.activate(this);
         }
     }
