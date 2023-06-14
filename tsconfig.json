@@ -29,7 +29,10 @@
       "./@types/webGL2.extras",
       "./node_modules/@cocos/cannon/CANNON",
       "./node_modules/@types/jest/index",
-      "./node_modules/@types/node/index",
+      // instead of use "./node_modules/@types/node/index", use what you need from @types/node/ as single file. 
+      // "./node_modules/@types/node/index",
+      "./node_modules/@types/node/timers",
+      "./node_modules/@types/node/path",
 
       // external types
       "./native/external/emscripten/external-wasm",
