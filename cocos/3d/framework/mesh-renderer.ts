@@ -23,7 +23,7 @@
  THE SOFTWARE.
 */
 import { JSB, NODEJS } from 'internal:constants';
-import { displayOrder, group, range } from 'cc.decorator';
+import { displayName, displayOrder, group, range } from 'cc.decorator';
 import { Texture2D, TextureCube } from '../../asset/assets';
 import { Material } from '../../asset/assets/material';
 import { Mesh } from '../assets/mesh';
@@ -38,10 +38,27 @@ import { NodeEventType } from '../../scene-graph/node-event';
 import { Texture } from '../../gfx';
 import { builtinResMgr } from '../../asset/asset-manager/builtin-res-mgr';
 import { settings, Settings } from '../../core/settings';
-import { ReflectionProbeType } from './reflection-probe-enum';
+import { ReflectionProbeType } from '../reflection-probe/reflection-probe-enum';
+import { getPhaseID } from '../../rendering/pass-phase';
+import { SubModel } from '../../render-scene/scene';
+import { isEnableEffect } from '../../rendering/define';
 
 const { property, ccclass, help, executeInEditMode, executionOrder, menu, tooltip, visible, type,
     formerlySerializedAs, serializable, editable, disallowAnimation } = _decorator;
+
+let _phaseID = getPhaseID('specular-pass');
+function getSkinPassIndex (subModel: SubModel): number {
+    const passes = subModel.passes;
+    const r = cclegacy.rendering;
+    if (isEnableEffect()) _phaseID = r.getPhaseID(r.getPassID('specular-pass'), 'default');
+    for (let k = 0; k < passes.length; k++) {
+        if (((!r || !r.enableEffectImport) && passes[k].phase === _phaseID)
+            || (isEnableEffect() && passes[k].phaseID === _phaseID)) {
+            return k;
+        }
+    }
+    return -1;
+}
 
 /**
  * @en Shadow projection mode.
@@ -307,6 +324,9 @@ export class MeshRenderer extends ModelRenderer {
     @serializable
     protected _reflectionProbeBlendWeight = 0;
 
+    @serializable
+    protected _enabledGlobalStandardSkinObject = false;
+
     protected _reflectionProbeDataMap: Texture2D | null = null;
 
     // @serializable
@@ -356,6 +376,7 @@ export class MeshRenderer extends ModelRenderer {
     @tooltip('i18n:model.shadow_casting_model')
     @group({ id: 'DynamicShadow', name: 'DynamicShadowSettings' })
     @disallowAnimation
+    @visible(false)
     get shadowCastingMode () {
         return this._shadowCastingMode;
     }
@@ -363,6 +384,17 @@ export class MeshRenderer extends ModelRenderer {
     set shadowCastingMode (val) {
         this._shadowCastingMode = val;
         this._updateCastShadow();
+    }
+
+    @displayName('Shadow Casting Mode')
+    @tooltip('i18n:model.shadow_casting_model')
+    @group({ id: 'DynamicShadow', name: 'DynamicShadowSettings' })
+    @disallowAnimation
+    get shadowCastingModeForInspector (): boolean {
+        return this.shadowCastingMode === ModelShadowCastingMode.ON;
+    }
+    set shadowCastingModeForInspector (val) {
+        this.shadowCastingMode = val === true ? ModelShadowCastingMode.ON : ModelShadowCastingMode.OFF;
     }
 
     /**
@@ -389,15 +421,24 @@ export class MeshRenderer extends ModelRenderer {
      * @zh 实时光照下是否接受阴影。
      */
     @type(ModelShadowReceivingMode)
-    @tooltip('i18n:model.shadow_receiving_model')
-    @group({ id: 'DynamicShadow', name: 'DynamicShadowSettings' })
-    @disallowAnimation
+    @visible(false)
     get receiveShadow () {
         return this._shadowReceivingMode;
     }
-
     set receiveShadow (val) {
         this._shadowReceivingMode = val;
+        this._updateReceiveShadow();
+    }
+
+    @displayName('Receive Shadow')
+    @tooltip('i18n:model.shadow_receiving_model')
+    @group({ id: 'DynamicShadow', name: 'DynamicShadowSettings' })
+    @disallowAnimation
+    get receiveShadowForInspector () {
+        return this._shadowReceivingMode === ModelShadowReceivingMode.ON;
+    }
+    set receiveShadowForInspector (val: boolean) {
+        this._shadowReceivingMode = val === true ? ModelShadowReceivingMode.ON : ModelShadowReceivingMode.OFF;
         this._updateReceiveShadow();
     }
 
@@ -459,6 +500,29 @@ export class MeshRenderer extends ModelRenderer {
 
     set enableMorph (value) {
         this._enableMorph = value;
+    }
+
+    /**
+     * @en local shadow normal bias for real time lighting.
+     * @zh 实时光照下模型局部的阴影法线偏移。
+     */
+    @type(CCBoolean)
+    @tooltip('i18n:model.standard_skin_model')
+    @disallowAnimation
+    get isGlobalStandardSkinObject () {
+        return this._enabledGlobalStandardSkinObject;
+    }
+
+    set isGlobalStandardSkinObject (val) {
+        cclegacy.director.root.pipeline.pipelineSceneData.standardSkinModel = val ? this : null;
+        this._enabledGlobalStandardSkinObject = val;
+    }
+
+    /**
+     * @engineInternal
+     */
+    public clearGlobalStandardSkinObjectFlag () {
+        this._enabledGlobalStandardSkinObject = false;
     }
 
     protected _modelType: typeof scene.Model;
@@ -860,11 +924,19 @@ export class MeshRenderer extends ModelRenderer {
         if (!mainLight) { return; }
         const visibility = mainLight.visibility;
         if (!mainLight.node) { return; }
-        if (mainLight.node.mobility === MobilityMode.Static
-            && (this.bakeSettings.texture || (this.node.scene.globals.lightProbeInfo.data
-            && this.node.scene.globals.lightProbeInfo.data.hasCoefficients()
-            && this._model.useLightProbe))) {
-            this.onUpdateReceiveDirLight(visibility, true);
+
+        if (mainLight.node.mobility === MobilityMode.Static) {
+            let forceClose = false;
+            if (this.bakeSettings.texture && !this.node.scene.globals.disableLightmap) {
+                forceClose = true;
+            }
+            if (this.node.scene.globals.lightProbeInfo.data
+                && this.node.scene.globals.lightProbeInfo.data.hasCoefficients()
+                && this._model.useLightProbe) {
+                forceClose = true;
+            }
+
+            this.onUpdateReceiveDirLight(visibility, forceClose);
         } else {
             this.onUpdateReceiveDirLight(visibility);
         }
@@ -898,7 +970,12 @@ export class MeshRenderer extends ModelRenderer {
         if (this._model.scene !== null) {
             this._detachFromScene();
         }
-        renderScene.addModel(this._model);
+
+        if (this.isUseGPUScene()) {
+            renderScene.addGPUModel(this._model);
+        } else {
+            renderScene.addModel(this._model);
+        }
     }
 
     /**
@@ -906,8 +983,30 @@ export class MeshRenderer extends ModelRenderer {
      */
     public _detachFromScene () {
         if (this._model && this._model.scene) {
-            this._model.scene.removeModel(this._model);
+            if (this.isUseGPUScene()) {
+                this._model.scene.removeGPUModel(this._model);
+            } else {
+                this._model.scene.removeModel(this._model);
+            }
         }
+    }
+
+    /**
+     * @engineInternal
+     */
+    public isUseGPUScene () {
+        const sceneData = cclegacy.director.root.pipeline.pipelineSceneData;
+        if (!sceneData || !sceneData.isGPUDrivenEnabled()) {
+            return false;
+        }
+
+        if (!this._mesh || !this.node) {
+            return false;
+        }
+
+        const useLightProbe = this.node.mobility === MobilityMode.Movable && this.bakeSettings.useLightProbe;
+        const useReflectionProbe = this.bakeSettings.reflectionProbe !== ReflectionProbeType.NONE;
+        return this.mesh!.canUseGPUScene() && !useLightProbe && !useReflectionProbe;
     }
 
     protected _updateModelParams () {
@@ -985,6 +1084,7 @@ export class MeshRenderer extends ModelRenderer {
     protected _onMaterialModified (idx: number, material: Material | null) {
         if (!this._model || !this._model.inited) { return; }
         this._onRebuildPSO(idx, material || this._getBuiltinMaterial());
+        this._updateStandardSkin();
     }
 
     /**
@@ -1200,6 +1300,25 @@ export class MeshRenderer extends ModelRenderer {
 
     private _uploadSubMeshShapesWeights (subMeshIndex: number) {
         this._morphInstance?.setWeights(subMeshIndex, this._subMeshShapesWeights[subMeshIndex]);
+    }
+
+    private _updateStandardSkin () {
+        const pipelineSceneData = (cclegacy.director.root as Root).pipeline.pipelineSceneData;
+        if (this._enabledGlobalStandardSkinObject) {
+            pipelineSceneData.standardSkinModel = this;
+        }
+        if (!pipelineSceneData.skinMaterialModel) {
+            for (let i = 0; i < this._models.length; i++) {
+                const subModels = this._models[i].subModels;
+                for (let j = 0; j < subModels.length; j++) {
+                    const subModel = subModels[j];
+                    const skinPassIdx = getSkinPassIndex(subModel);
+                    if (skinPassIdx < 0) { continue; }
+                    pipelineSceneData.skinMaterialModel = this._models[i];
+                    return;
+                }
+            }
+        }
     }
 }
 

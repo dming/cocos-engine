@@ -5,24 +5,25 @@ module.paths.push(path.join(Editor.App.path, 'node_modules'));
 const { throttle } = require('lodash');
 const utils = require('./utils');
 const { trackEventWithTimer } = require('../utils/metrics');
+const { injectionStyle } = require('../utils/prop');
 
 const lockList = [];
 let lockPerform = false;
 let lastSnapShot = null;
 async function performLock() {
-    if (lockPerform) return;
-    if (lockList.length === 0) return;
+    if (lockPerform) { return; }
+    if (lockList.length === 0) { return; }
     lockPerform = true;
     const params = lockList.shift();
     const { snapshotLock, lock, uuids, cancel } = params;
     if (snapshotLock && !lock) {
-        
+
         if (lastSnapShot) {
-            await endRecording(lastSnapShot,cancel);
+            await endRecording(lastSnapShot, cancel);
             lastSnapShot = null;
         }
     // start snapshot
-    } else if(!snapshotLock && lock) {
+    } else if (!snapshotLock && lock) {
         lastSnapShot = await beginRecording(uuids);
     }
     lockPerform = false;
@@ -35,14 +36,14 @@ async function performLock() {
  * @param {*} uuids 
  * @param {*} cancel 
  */
-function snapshotLock(panel,lock,uuids,cancel=false) {
+function snapshotLock(panel, lock, uuids, cancel = false) {
     // 保存当前状态，放到队列中
     const params = {
         snapshotLock:panel.snapshotLock,
         lock,
         uuids,
-        cancel
-    }
+        cancel,
+    };
     lockList.push(params);
     // 执行队列中的操作;
     performLock();
@@ -50,17 +51,17 @@ function snapshotLock(panel,lock,uuids,cancel=false) {
 }
 
 // 不传options时，会自动记录到undo队列，不需要调用endRecording
-async function beginRecording(uuids,options) {
-    if (!uuids) return;
-    const undoID = await Editor.Message.request('scene', 'begin-recording', uuids,options);
+async function beginRecording(uuids, options) {
+    if (!uuids) { return; }
+    const undoID = await Editor.Message.request('scene', 'begin-recording', uuids, options);
     return undoID;
 }
 
-async function endRecording(undoID,cancel) {
-    if(!undoID) return;
-    if(cancel){
+async function endRecording(undoID, cancel) {
+    if (!undoID) { return; }
+    if (cancel) {
         await Editor.Message.request('scene', 'cancel-recording', undoID);
-    }else{
+    } else {
         await Editor.Message.request('scene', 'end-recording', undoID);
     }
 }
@@ -73,6 +74,9 @@ exports.listeners = {
         if (!target) {
             return;
         }
+
+        clearTimeout(panel.previewTimeId);
+
         if (!panel.snapshotLock) {
             snapshotLock(panel, true, panel.uuidList);
         }
@@ -153,14 +157,15 @@ exports.listeners = {
             console.error(error);
         } finally {
             if (!panel.snapshotLock) {
-                snapshotLock(panel,false);
+                snapshotLock(panel, false);
             }
             panel.readyToUpdate = true;
         }
     },
     'confirm-dump'() {
         const panel = this;
-        snapshotLock(panel,false);
+        clearTimeout(panel.previewTimeId);
+        snapshotLock(panel, false);
         // In combination with change-dump, snapshot only generated once after ui-elements continuously changed.
         // Editor.Message.send('scene', 'snapshot');
     },
@@ -171,6 +176,8 @@ exports.listeners = {
         if (!target) {
             return;
         }
+
+        clearTimeout(panel.previewTimeId);
 
         // Editor.Message.send('scene', 'snapshot');
         const undoID = await beginRecording(panel.uuidList);
@@ -194,7 +201,7 @@ exports.listeners = {
             cancel = true;
             console.error(error);
         }
-        await endRecording(undoID,cancel);
+        await endRecording(undoID, cancel);
     },
     async 'reset-dump'(event) {
         const panel = this;
@@ -203,6 +210,8 @@ exports.listeners = {
         if (!target) {
             return;
         }
+
+        clearTimeout(panel.previewTimeId);
 
         const undoID = await beginRecording(panel.uuidList);
         const dump = event.target.dump;
@@ -220,7 +229,7 @@ exports.listeners = {
                 });
             }
         } catch (error) {
-            await endRecording(undoID,true);
+            await endRecording(undoID, true);
             console.error(error);
         }
     },
@@ -251,9 +260,10 @@ exports.listeners = {
         }
 
         const { method, value: assetUuid } = event.detail;
-        if (method === 'confirm') {
-            clearTimeout(panel.previewTimeId);
 
+        clearTimeout(panel.previewTimeId);
+
+        if (method === 'confirm') {
             try {
                 panel.previewTimeId = setTimeout(() => {
                     for (let i = 0; i < panel.uuidList.length; i++) {
@@ -264,8 +274,6 @@ exports.listeners = {
                         if (dump.values) {
                             value = dump.values[i];
                         }
-
-
 
                         // 预览新的值
                         value.uuid = assetUuid;
@@ -284,21 +292,21 @@ exports.listeners = {
                 console.error(error);
             }
         } else if (method === 'cancel') {
-            clearTimeout(panel.previewTimeId);
+            panel.previewTimeId = setTimeout(() => {
+                try {
+                    for (let i = 0; i < panel.uuidList.length; i++) {
+                        const uuid = panel.uuidList[i];
+                        const { path } = dump;
 
-            try {
-                for (let i = 0; i < panel.uuidList.length; i++) {
-                    const uuid = panel.uuidList[i];
-                    const { path } = dump;
-
-                    Editor.Message.send('scene', 'cancel-preview-set-property', {
-                        uuid,
-                        path,
-                    });
+                        Editor.Message.send('scene', 'cancel-preview-set-property', {
+                            uuid,
+                            path,
+                        });
+                    }
+                } catch (error) {
+                    console.error(error);
                 }
-            } catch (error) {
-                console.error(error);
-            }
+            }, 50);
         }
     },
 };
@@ -646,7 +654,7 @@ const Elements = {
                             break;
                         }
                         case 'unlink': {
-                            const undoID = await beginRecording( prefab.rootUuid);
+                            const undoID = await beginRecording(prefab.rootUuid);
                             await Editor.Message.request('scene', 'unlink-prefab', prefab.rootUuid, false);
                             await endRecording(undoID);
                             break;
@@ -656,7 +664,7 @@ const Elements = {
                             break;
                         }
                         case 'reset': {
-                            const undoID = await beginRecording( prefab.rootUuid);
+                            const undoID = await beginRecording(prefab.rootUuid);
                             await Editor.Message.request('scene', 'restore-prefab', prefab.rootUuid, prefab.uuid);
                             await endRecording(undoID);
                             break;
@@ -756,7 +764,7 @@ const Elements = {
                 panel.$.name.dispatch('change-dump');
             });
             panel.$.name.addEventListener('confirm', () => {
-                panel.$.active.dispatch('confirm-dump');
+                panel.$.name.dispatch('confirm-dump');
             });
         },
         update() {
@@ -1211,6 +1219,10 @@ const Elements = {
                         }
                         $active.dispatch('change-dump');
                     });
+                    $active.addEventListener('confirm', (event) => {
+                        event.stopPropagation();
+                        $active.dispatch('confirm-dump');
+                    });
 
                     const $link = $section.querySelector('.link');
                     const url = panel.getHelpUrl(component.editor);
@@ -1252,16 +1264,8 @@ const Elements = {
 
                     renderList.forEach((file) => {
                         const $panel = document.createElement('ui-panel');
+                        $panel.injectionStyle(injectionStyle);
                         $panel.setAttribute('src', file);
-                        $panel.injectionStyle(`
-                            ui-prop,
-                            ui-section { margin-top: 4px; }
-
-                            ui-prop > ui-section,
-                            ui-prop > ui-prop,
-                            ui-section > ui-prop[slot="header"],
-                            ui-prop [slot="content"] ui-prop { margin-top: 0; }
-                        `);
 
                         $panel.shadowRoot.addEventListener('change-dump', (event) => {
                             exports.listeners['change-dump'].call(panel, event);
@@ -1309,6 +1313,7 @@ const Elements = {
                 panel.renderMap.section['cc.Node'].forEach((file, index) => {
                     if (!array[index]) {
                         array[index] = document.createElement('ui-panel');
+                        array[index].injectionStyle(injectionStyle);
                         panel.$.nodeSection.appendChild(array[index]);
                     }
                     array[index].setAttribute('src', file);
@@ -1464,10 +1469,10 @@ const Elements = {
                     ],
                     listeners: {
                         async confirm(detail/* info */) {
-                            if (!detail) return;
+                            if (!detail) { return; }
 
                             // 批量调用request意味着编辑操作在很多帧后才会完成，所以不能自动记录undo
-                            const undoID = await beginRecording(panel.uuidList)
+                            const undoID = await beginRecording(panel.uuidList);
                             for (const uuid of panel.uuidList) {
                                 await Editor.Message.request('scene', 'create-component', {
                                     uuid,
@@ -1477,7 +1482,7 @@ const Elements = {
                             if (detail.info.name) {
                                 trackEventWithTimer('laber', `A100000_${detail.info.name}`);
                             }
-                            await endRecording(undoID)
+                            await endRecording(undoID);
                         },
                     },
                 });
@@ -1502,6 +1507,7 @@ const Elements = {
                 if (!materialPanel) {
                     // 添加新的
                     materialPanel = document.createElement('ui-panel');
+                    materialPanel.injectionStyle(injectionStyle);
                     materialPanel.setAttribute('src', panel.typeManager[materialPanelType]);
                     materialPanel.setAttribute('type', materialPanelType);
                     materialPanel.setAttribute('uuid', materialUuid);
@@ -1660,7 +1666,7 @@ exports.methods = {
                     label: Editor.I18n.t('ENGINE.menu.reset_component'),
                     async click() {
                         const values = dump.value.uuid.values || [dump.value.uuid.value];
-                        const undoID = await beginRecording(values)
+                        const undoID = await beginRecording(values);
                         for (const compUuid of values) {
                             await Editor.Message.request('scene', 'reset-component', {
                                 uuid: compUuid,
@@ -1673,8 +1679,6 @@ exports.methods = {
                 {
                     label: Editor.I18n.t('ENGINE.menu.remove_component'),
                     async click() {
-                        // Editor.Message.send('scene', 'snapshot');
-
                         const values = dump.value.uuid.values || [dump.value.uuid.value];
                         // 收集待修改的uuids
                         const uuids = [];
@@ -1692,17 +1696,16 @@ exports.methods = {
                                 }
                             }
                         }
-                        if (!uuids.length > 0) return;
+                        if (!uuids.length > 0) { return; }
                         const undoID = await beginRecording(uuids);
-                        for (let index = 0; index < uuids.length; index++) {
+                        for (let i = 0; i < uuids.length; i++) {
                             await Editor.Message.request('scene', 'remove-array-element', {
-                                uuid: uuids[index],
+                                uuid: uuids[i],
                                 path: '__comps__',
-                                index:indexes[index],
+                                index: indexes[i],
                             });
                         }
                         await endRecording(undoID);
-                        // Editor.Message.send('scene', 'snapshot');
                     },
                 },
                 {
@@ -1765,16 +1768,18 @@ exports.methods = {
                         }
                         const undoID = await beginRecording(uuids);
                         // 遍历uuids
-                        for (let index = 0; index < uuids.length; index++) {
-                            const uuid = uuids[index];
-                            const index = indexes[index];
+                        for (let i = 0; i < uuids.length; i++) {
+                            const uuid = uuids[i];
+                            const index = indexes[i];
+
+                            const nodeDump = nodeDumps.find(nodeDump => uuid === nodeDump.uuid.value);
                             await Editor.Message.request('scene', 'set-property', {
                                 uuid,
-                                path: nodeDumps[index].__comps__[index].path,
+                                path: nodeDump.__comps__[index].path,
                                 dump: clipboardComponentInfo.dump,
                             });
                         }
-                        await endRecording(undoID); 
+                        await endRecording(undoID);
                     },
                 },
                 { type: 'separator' },
@@ -1783,7 +1788,7 @@ exports.methods = {
                     label: Editor.I18n.t('ENGINE.menu.paste_component'),
                     enabled: !!clipboardComponentInfo,
                     async click() {
-                        const undoID = await beginRecording(uuidList)
+                        const undoID = await beginRecording(uuidList);
                         const values = dump.value.uuid.values || [dump.value.uuid.value];
                         let index = 0;
                         for (const dump of values) {

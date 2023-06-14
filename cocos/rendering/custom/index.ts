@@ -64,9 +64,14 @@ export function setCustomPipeline (name: string, builder: PipelineBuilder) {
     customPipelineBuilderMap.set(name, builder);
 }
 export function getCustomPipeline (name: string): PipelineBuilder {
-    let builder = customPipelineBuilderMap.get(name) || null;
-    if (builder === null) {
-        builder = customPipelineBuilderMap.get('Forward')!;
+    let builder = customPipelineBuilderMap.get(name);
+    if (!builder) {
+        if (name === 'Test') {
+            builder = new TestPipelineBuilder(_pipeline!.pipelineSceneData);
+            customPipelineBuilderMap.set('Test', builder);
+        } else {
+            builder = customPipelineBuilderMap.get('Forward')!;
+        }
     }
     return builder;
 }
@@ -74,7 +79,7 @@ export function getCustomPipeline (name: string): PipelineBuilder {
 function addCustomBuiltinPipelines (map: Map<string, PipelineBuilder>) {
     map.set('Forward', new ForwardPipelineBuilder());
     map.set('Deferred', new DeferredPipelineBuilder());
-    map.set('Custom', new CustomPipelineBuilder());
+    map.set('Deprecated', new CustomPipelineBuilder());
 }
 
 addCustomBuiltinPipelines(customPipelineBuilderMap);

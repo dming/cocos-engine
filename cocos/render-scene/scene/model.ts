@@ -41,7 +41,7 @@ import { Root } from '../../root';
 import { TextureCube } from '../../asset/assets';
 import { ShadowType } from './shadows';
 import { ProbeType, ReflectionProbe } from './reflection-probe';
-import { ReflectionProbeType } from '../../3d/framework/reflection-probe-enum';
+import { ReflectionProbeType } from '../../3d/reflection-probe/reflection-probe-enum';
 
 const m4_1 = new Mat4();
 
@@ -127,7 +127,7 @@ export class Model {
      * @zh 获取世界空间包围盒
      */
     get worldBounds () {
-        return this._worldBounds!;
+        return this._worldBounds;
     }
 
     /**
@@ -836,8 +836,10 @@ export class Model {
      */
     public createBoundingShape (minPos?: Vec3, maxPos?: Vec3) {
         if (!minPos || !maxPos) { return; }
-        this._modelBounds = geometry.AABB.fromPoints(geometry.AABB.create(), minPos, maxPos);
-        this._worldBounds = geometry.AABB.clone(this._modelBounds);
+        if (!this._modelBounds) { this._modelBounds = geometry.AABB.create(); }
+        if (!this._worldBounds) { this._worldBounds = geometry.AABB.create(); }
+        geometry.AABB.fromPoints(this._modelBounds, minPos, maxPos);
+        geometry.AABB.copy(this._worldBounds, this._modelBounds);
     }
 
     private _createSubModel () {
@@ -1153,17 +1155,15 @@ export class Model {
     public getMacroPatches (subModelIndex: number): IMacroPatch[] | null {
         let patches = this.receiveShadow ? shadowMapPatches : null;
         if (this._lightmap != null) {
-            let stationary = false;
-            if (this.node && this.node.scene) {
-                stationary = this.node.scene.globals.bakedWithStationaryMainLight;
-            }
+            if (this.node && this.node.scene && !this.node.scene.globals.disableLightmap) {
+                const mainLightIsStationary = this.node.scene.globals.bakedWithStationaryMainLight;
+                const lightmapPathes = mainLightIsStationary ? stationaryLightMapPatches : staticLightMapPatches;
 
-            const lightmapPathes = stationary ? stationaryLightMapPatches : staticLightMapPatches;
-            patches = patches ? patches.concat(lightmapPathes) : lightmapPathes;
-
-            // use highp lightmap
-            if (this.node.scene.globals.bakedWithHighpLightmap) {
-                patches = patches.concat(highpLightMapPatches);
+                patches = patches ? patches.concat(lightmapPathes) : lightmapPathes;
+                // use highp lightmap
+                if (this.node.scene.globals.bakedWithHighpLightmap) {
+                    patches = patches.concat(highpLightMapPatches);
+                }
             }
         }
         if (this._useLightProbe) {

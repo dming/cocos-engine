@@ -1,6 +1,6 @@
 import { Camera } from '../../../render-scene/scene';
 import { buildShadowPasses, getCameraUniqueID } from '../../custom/define';
-import { Pipeline } from '../../custom/pipeline';
+import { Pipeline, PipelineType } from '../../custom/pipeline';
 import { passContext } from '../utils/pass-context';
 import { BasePass } from './base-pass';
 

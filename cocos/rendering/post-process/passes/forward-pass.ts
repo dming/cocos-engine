@@ -3,12 +3,12 @@ import { Vec4 } from '../../../core';
 import { director } from '../../../game';
 
 import { ClearFlagBit, Format } from '../../../gfx';
-import { Camera } from '../../../render-scene/scene';
+import { Camera, CameraUsage } from '../../../render-scene/scene';
 import { AccessType, LightInfo, QueueHint, ResourceResidency, SceneFlags } from '../../custom';
 import { getCameraUniqueID } from '../../custom/define';
 import { Pipeline } from '../../custom/pipeline';
 import { passContext } from '../utils/pass-context';
-import { BasePass } from './base-pass';
+import { BasePass, getRTFormatBeforeToneMapping } from './base-pass';
 import { ShadowPass } from './shadow-pass';
 
 export class ForwardPass extends BasePass {
@@ -18,21 +18,21 @@ export class ForwardPass extends BasePass {
     enableInAllEditorCamera = true;
     depthBufferShadingScale = 1;
 
+    calcDepthSlot (camera: Camera) {
+        let canUsePrevDepth = !!passContext.depthSlotName;
+        canUsePrevDepth = !(camera.clearFlag & ClearFlagBit.DEPTH_STENCIL);
+        canUsePrevDepth = canUsePrevDepth && passContext.shadingScale === this.depthBufferShadingScale;
+        if (canUsePrevDepth) {
+            return;
+        }
+        this.depthBufferShadingScale = passContext.shadingScale;
+
+        passContext.depthSlotName = super.slotName(camera, 1);
+    }
+
     slotName (camera: Camera, index = 0) {
         if (index === 1) {
-            const cameraIdx = director.root!.cameraList.indexOf(camera);
-            if (cameraIdx === 0) {
-                this.depthBufferShadingScale = passContext.shadingScale;
-                return this.outputNames[index];
-            }
-
-            let canUsePrevDepth = true;
-            canUsePrevDepth = !(camera.clearFlag & ClearFlagBit.DEPTH_STENCIL);
-            canUsePrevDepth = canUsePrevDepth && passContext.shadingScale === this.depthBufferShadingScale;
-            if (canUsePrevDepth) {
-                return this.outputNames[index];
-            }
-            this.depthBufferShadingScale = passContext.shadingScale;
+            return passContext.depthSlotName;
         }
 
         return super.slotName(camera, index);
@@ -41,11 +41,9 @@ export class ForwardPass extends BasePass {
     public render (camera: Camera, ppl: Pipeline) {
         passContext.clearFlag = ClearFlagBit.COLOR | (camera.clearFlag & ClearFlagBit.DEPTH_STENCIL);
         Vec4.set(passContext.clearColor, 0, 0, 0, 0);
-
-        // passContext.clearFlag = camera.clearFlag;
-        // Vec4.set(passContext.clearColor, camera.clearColor.x, camera.clearColor.y, camera.clearColor.z, camera.clearColor.w);
-
         Vec4.set(passContext.clearDepthColor, camera.clearDepth, camera.clearStencil, 0, 0);
+
+        this.calcDepthSlot(camera);
 
         const slot0 = this.slotName(camera, 0);
         const slot1 = this.slotName(camera, 1);
@@ -55,7 +53,7 @@ export class ForwardPass extends BasePass {
         passContext
             .updatePassViewPort()
             .addRenderPass('default', `${this.name}_${cameraID}`)
-            .addRasterView(slot0, Format.RGBA16F, isOffScreen)
+            .addRasterView(slot0, getRTFormatBeforeToneMapping(ppl), isOffScreen)
             .addRasterView(slot1, Format.DEPTH_STENCIL, isOffScreen)
             .version();
 
@@ -78,12 +76,7 @@ export class ForwardPass extends BasePass {
             .addSceneOfCamera(camera,
                 new LightInfo(),
                 SceneFlags.OPAQUE_OBJECT | SceneFlags.PLANAR_SHADOW | SceneFlags.CUTOUT_OBJECT
-                | SceneFlags.DEFAULT_LIGHTING | SceneFlags.DRAW_INSTANCING);
-
-        pass.addQueue(QueueHint.RENDER_TRANSPARENT)
-            .addSceneOfCamera(camera,
-                new LightInfo(),
-                SceneFlags.UI | SceneFlags.TRANSPARENT_OBJECT | SceneFlags.GEOMETRY);
+                | SceneFlags.DEFAULT_LIGHTING | SceneFlags.DRAW_INSTANCING | SceneFlags.GEOMETRY);
 
         passContext.forwardPass = this;
     }

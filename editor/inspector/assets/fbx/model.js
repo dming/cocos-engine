@@ -29,6 +29,10 @@ exports.template = /* html */`
         <ui-checkbox slot="content" class="allowMeshDataAccess-checkbox"></ui-checkbox>
     </ui-prop>
     <ui-prop>
+        <ui-label slot="label" value="i18n:ENGINE.assets.fbx.addVertexColor.name" tooltip="i18n:ENGINE.assets.fbx.addVertexColor.title"></ui-label>
+        <ui-checkbox slot="content" class="addVertexColor-checkbox"></ui-checkbox>
+    </ui-prop>
+    <ui-prop>
         <ui-label slot="label" value="i18n:ENGINE.assets.fbx.promoteSingleRootNode.name" tooltip="i18n:ENGINE.assets.fbx.promoteSingleRootNode.title"></ui-label>
         <ui-checkbox slot="content" class="promoteSingleRootNode-checkbox"></ui-checkbox>
     </ui-prop>
@@ -127,6 +131,7 @@ exports.template = /* html */`
             <ui-label value="LODS" tooltip="To import LODs, please make sure the LOD mesh names are ending with _LOD#"></ui-label>
         </div>
         <div class="lod-items"></div>
+        <div class="not-lod-mesh-label" hidden></div>
         <div class="no-lod-label" hidden>There is no LOD(Level of Details) group can be detected in this model.LOD levels can be automatically generated with above settings.</div>
         <div class="load-mask">
             <ui-loading></ui-loading>
@@ -136,38 +141,13 @@ exports.template = /* html */`
 `;
 
 exports.style = /* css */`
-ui-prop,
-ui-section {
-    margin: 4px 0;
-}
 .warn-words {
-    margin-top: 20px;
-    margin-bottom: 20px;
-    line-height: 1.7;
     color: var(--color-warn-fill);
 }
-.mesh-optimizer .algorithm {
-    margin-top: 10px;
-    padding-left: 20px;
-}
-.mesh-optimizer .simplify-options > ui-prop {
-    padding-left: 20px;
-}
-.mesh-optimizer ui-section > ui-prop,
-.lods ui-section > ui-prop {
-    padding-left: 10px;
-}
-.mesh-optimizer .warn-words {
-    padding-left: 20px;
-}
-.mesh-optimizer .gltfpack-options .warn-words {
-    padding-left: 10px;
+.lods {
     margin-top: 0;
 }
 
-.lod-item {
-    padding-left: 20px;
-}
 .lod-item .lod-item-header {
     flex: 1;
     display: flex;
@@ -233,11 +213,11 @@ ui-section {
     background: var(--color-hover-fill-weaker);
     color: var(--color-focus-contrast-emphasis);
 }
+.lods .not-lod-mesh-label,
 .lods .no-lod-label {
-    padding-left: 20px;
-    text-align: center;
-    margin-top: 4px;
+    color: var(--color-default-fill-weakest)
 }
+.lods .not-lod-mesh-label[hidden],
 .lods .no-lod-label[hidden] {
     display: none;
 }
@@ -268,6 +248,7 @@ exports.$ = {
     skipValidationCheckbox: '.skipValidation-checkbox',
     disableMeshSplitCheckbox: '.disableMeshSplit-checkbox',
     allowMeshDataAccessCheckbox: '.allowMeshDataAccess-checkbox',
+    addVertexColorCheckbox: '.addVertexColor-checkbox',
     promoteSingleRootNodeCheckbox: '.promoteSingleRootNode-checkbox',
     generateLightmapUVNodeCheckbox: '.generateLightmapUVNode-checkbox',
     meshOptimizerCheckbox: '.meshOptimizer-checkbox',
@@ -293,6 +274,7 @@ exports.$ = {
     lodsCheckbox: '.lods-checkbox',
     lodItems: '.lod-items',
     noLodLabel: '.no-lod-label',
+    notLodMeshLabel: '.not-lod-mesh-label',
     loadMask: '.load-mask',
 };
 
@@ -430,6 +412,28 @@ const Elements = {
 
             updateElementInvalid.call(panel, panel.$.allowMeshDataAccessCheckbox, 'allowMeshDataAccess');
             updateElementReadonly.call(panel, panel.$.allowMeshDataAccessCheckbox);
+        },
+    },
+    addVertexColorCheckbox: {
+        ready() {
+            const panel = this;
+
+            panel.$.addVertexColorCheckbox.addEventListener('change', panel.setProp.bind(panel, 'addVertexColor', 'boolean'));
+            panel.$.addVertexColorCheckbox.addEventListener('confirm', () => {
+                panel.dispatch('snapshot');
+            });
+        },
+        update() {
+            const panel = this;
+
+            let defaultValue = false;
+            if (panel.meta.userData) {
+                defaultValue = getPropValue.call(panel, panel.meta.userData.addVertexColor, defaultValue);
+            }
+            panel.$.addVertexColorCheckbox.value = defaultValue;
+
+            updateElementInvalid.call(panel, panel.$.addVertexColorCheckbox, 'addVertexColor');
+            updateElementReadonly.call(panel, panel.$.addVertexColorCheckbox);
         },
     },
     // move this from ./fbx.js in v3.6.0
@@ -799,58 +803,6 @@ const Elements = {
                         break;
                 }
             });
-            // Listening to the addition and removal of the lod hierarchy
-            panel.$.lodItems.addEventListener('click', (event) => {
-                event.stopPropagation();
-                event.preventDefault();
-                const path = event.target.getAttribute('path');
-                const index = Number(event.target.getAttribute('key'));
-                const lods = panel.meta.userData.lods;
-                if (!lods) {
-                    return;
-                }
-                if (path === 'insertLod') {
-                    if (Object.keys(lods.options).length >= 8) {
-                        console.warn('Maximum 8 LOD, Can\'t add more LOD');
-                        return;
-                    }
-                    const preScreenRatio = lods.options[index].screenRatio;
-                    const nextScreenRatio = lods.options[index + 1] ? lods.options[index + 1].screenRatio : 0;
-                    const preFaceCount = lods.options[index].faceCount;
-                    const nextFaceCount = lods.options[index + 1] ? lods.options[index + 1].faceCount : 0;
-                    const option = {
-                        screenRatio: (preScreenRatio + nextScreenRatio) / 2,
-                        faceCount: (preFaceCount + nextFaceCount) / 2,
-                    };
-                    // Insert the specified lod level
-                    for (let keyIndex = Object.keys(lods.options).length - 1; keyIndex > index; keyIndex--) {
-                        lods.options[keyIndex + 1] = lods.options[keyIndex];
-                        panel.LODTriangleCounts[keyIndex + 1] = panel.LODTriangleCounts[keyIndex];
-                    }
-                    lods.options[index + 1] = option;
-                    panel.LODTriangleCounts[index + 1] = 0;
-                    // update panel
-                    Elements.lods.update.call(panel);
-                    panel.dispatch('change');
-                    panel.dispatch('snapshot');
-                } else if (path === 'deleteLod') {
-                    if (Object.keys(lods.options).length <= 1) {
-                        console.warn('At least one LOD, Can\'t delete any more');
-                        return;
-                    }
-                    // Delete the specified lod level
-                    for (let key = index; key < Object.keys(lods.options).length; key++) {
-                        lods.options[key] = lods.options[key + 1];
-                        panel.LODTriangleCounts[key] = panel.LODTriangleCounts[key + 1];
-                    }
-                    lods.options.pop();
-                    panel.LODTriangleCounts.pop();
-                    // update panel
-                    Elements.lods.update.call(panel);
-                    panel.dispatch('change');
-                    panel.dispatch('snapshot');
-                }
-            });
             panel.$.lodItems.addEventListener('confirm', () => {
                 panel.dispatch('snapshot');
             });
@@ -863,9 +815,71 @@ const Elements = {
             const hasBuiltinLOD = panel.meta.userData.lods && panel.meta.userData.lods.hasBuiltinLOD || false;
             panel.$.lodItems.innerHTML = getLodItemHTML(lodOptions, panel.LODTriangleCounts, hasBuiltinLOD);
             hasBuiltinLOD ? panel.$.noLodLabel.setAttribute('hidden', '') : panel.$.noLodLabel.removeAttribute('hidden');
+            if (panel.notLODTriangleCounts && panel.notLODTriangleCounts.length > 0) {
+                const totalNotLODTriangleCounts = panel.notLODTriangleCounts.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
+                panel.$.notLodMeshLabel.innerHTML = `There are ${panel.notLODTriangleCounts.length} non-LOD mesh(es) in the FBX, and the total triangles count is ${totalNotLODTriangleCounts}.`;
+                panel.$.notLodMeshLabel.removeAttribute('hidden');
+            } else {
+                panel.$.notLodMeshLabel.setAttribute('hidden', '');
+            }
             if (panel.$.loadMask.style.display === 'block' && this.asset.imported) {
                 panel.$.loadMask.style.display = 'none';
             }
+            // Listening to the addition and removal of the lod hierarchy
+            const uiIcons = panel.$.lodItems.querySelectorAll('ui-icon[value="add"], .lod-items ui-icon[value="reduce"]');
+            uiIcons.forEach((uiIcon) => {
+                uiIcon.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const path = event.target.getAttribute('path');
+                    const index = Number(event.target.getAttribute('key'));
+                    const lods = panel.meta.userData.lods;
+                    if (!lods) {
+                        return;
+                    }
+
+                    if (path === 'insertLod') {
+                        if (Object.keys(lods.options).length >= 8) {
+                            console.warn('Maximum 8 LOD, Can\'t add more LOD');
+                            return;
+                        }
+                        const preScreenRatio = lods.options[index].screenRatio;
+                        const nextScreenRatio = lods.options[index + 1] ? lods.options[index + 1].screenRatio : 0;
+                        const preFaceCount = lods.options[index].faceCount;
+                        const nextFaceCount = lods.options[index + 1] ? lods.options[index + 1].faceCount : 0;
+                        const option = {
+                            screenRatio: (preScreenRatio + nextScreenRatio) / 2,
+                            faceCount: (preFaceCount + nextFaceCount) / 2,
+                        };
+                        // Insert the specified lod level
+                        for (let keyIndex = Object.keys(lods.options).length - 1; keyIndex > index; keyIndex--) {
+                            lods.options[keyIndex + 1] = lods.options[keyIndex];
+                            panel.LODTriangleCounts[keyIndex + 1] = panel.LODTriangleCounts[keyIndex];
+                        }
+                        lods.options[index + 1] = option;
+                        panel.LODTriangleCounts[index + 1] = 0;
+                        // update panel
+                        Elements.lods.update.call(panel);
+                        panel.dispatch('change');
+                        panel.dispatch('snapshot');
+                    } else if (path === 'deleteLod') {
+                        if (Object.keys(lods.options).length <= 1) {
+                            console.warn('At least one LOD, Can\'t delete any more');
+                            return;
+                        }
+                        // Delete the specified lod level
+                        for (let key = index; key < Object.keys(lods.options).length; key++) {
+                            lods.options[key] = lods.options[key + 1];
+                            panel.LODTriangleCounts[key] = panel.LODTriangleCounts[key + 1];
+                        }
+                        lods.options.pop();
+                        panel.LODTriangleCounts.pop();
+                        // update panel
+                        Elements.lods.update.call(panel);
+                        panel.dispatch('change');
+                        panel.dispatch('snapshot');
+                    }
+                });
+            });
 
             updateElementInvalid.call(panel, panel.$.lodsCheckbox, 'lods.enable');
             updateElementReadonly.call(panel, panel.$.lodsCheckbox, hasBuiltinLOD);
@@ -886,7 +900,7 @@ exports.methods = {
     },
     apply() {
         this.$.loadMask.style.display = 'block';
-    }
+    },
 };
 
 exports.ready = function() {
@@ -906,7 +920,9 @@ exports.update = function(assetList, metaList) {
     this.metaList = metaList;
     this.asset = assetList[0];
     this.meta = metaList[0];
-    this.LODTriangleCounts = handleLODTriangleCounts(this.meta);
+    const { LODTriangleCounts, notLODTriangleCounts } = handleLODTriangleCounts(this.meta);
+    this.LODTriangleCounts = LODTriangleCounts;
+    this.notLODTriangleCounts = notLODTriangleCounts;
 
     for (const prop in Elements) {
         const element = Elements[prop];
@@ -932,15 +948,24 @@ function handleLODTriangleCounts(meta) {
         return [];
     }
     let LODTriangleCounts = new Array(meta.userData.lods.options.length).fill(0);
+    let notLODTriangleCounts = new Array();
     for (const key in meta.subMetas) {
         const subMeta = meta.subMetas[key];
         if (subMeta.importer === 'gltf-mesh') {
             const { lodOptions, triangleCount, lodLevel } = subMeta.userData;
             const index = !meta.userData.lods.hasBuiltinLOD ? (lodOptions ? lodLevel : 0) : lodLevel;
+            // When an FBX comes with LOD, there may be non-LOD meshes, and the count of these meshes should be calculated separately.
+            if (index === undefined) {
+                notLODTriangleCounts.push(triangleCount || 0);
+                continue;
+            }
             LODTriangleCounts[index] = (LODTriangleCounts[index] || 0) + (triangleCount || 0);
         }
     }
-    return LODTriangleCounts;
+    return {
+        LODTriangleCounts,
+        notLODTriangleCounts,
+    };
 }
 
 function getLodItemHTML(lodOptions, LODTriangleCounts, hasBuiltinLOD = false) {

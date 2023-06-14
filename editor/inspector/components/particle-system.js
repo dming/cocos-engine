@@ -37,9 +37,9 @@ exports.template = /* html*/`
         <div id="customProps"></div>
 
         <ui-section key="renderCulling" autoExpand cache-expand="particle-system-cullingMode">
-            <ui-prop slot="header" class="header" empty="true" labelflag="renderCulling" key="renderCulling">
-                <ui-label></ui-label>
+            <ui-prop slot="header" no-label class="header" empty="true" labelflag="renderCulling" key="renderCulling">
                 <ui-checkbox></ui-checkbox>
+                <ui-label></ui-label>
             </ui-prop>
             <ui-prop type="dump" key="cullingMode" disableflag="!renderCulling"></ui-prop>
             <ui-prop type="dump" key="aabbHalfX" disableflag="!renderCulling"></ui-prop>
@@ -49,10 +49,10 @@ exports.template = /* html*/`
                 <ui-label slot="label" value="Show Bounds"></ui-label>
                 <ui-checkbox slot="content" id="showBounds"></ui-checkbox>
             </ui-prop>
-            <ui-button id="resetBounds">Regenerate bounding box</ui-button>
+            <ui-button id="resetBounds" style="width:200px;margin: 4px auto 0 auto;">Regenerate bounding box</ui-button>
         </ui-section>
-        <ui-section class="config" key="noiseModule.value.enable" autoExpand cache-expand="particle-system-useNoise">
-            <ui-prop slot="header" class="header" empty="true" key="noiseModule.value.enable">
+        <ui-section key="noiseModule.value.enable" autoExpand cache-expand="particle-system-useNoise">
+            <ui-prop slot="header" no-label class="header" empty="true" key="noiseModule.value.enable">
                 <ui-checkbox></ui-checkbox>
                 <ui-label value="Noise Module"></ui-label>
             </ui-prop>
@@ -77,8 +77,8 @@ exports.template = /* html*/`
             <ui-prop type="dump" key="noiseModule.value.octaveMultiplier" disableflag="!noiseModule.value.enable"></ui-prop>
             <ui-prop type="dump" key="noiseModule.value.octaveScale" disableflag="!noiseModule.value.enable"></ui-prop>
         </ui-section>
-        <ui-section class="config" key="shapeModule" cache-expand="particle-system-shapeModule">
-            <ui-prop slot="header" class="header" type="dump" key="shapeModule.value.enable" labelflag="shapeModule"
+        <ui-section key="shapeModule" cache-expand="particle-system-shapeModule">
+            <ui-prop slot="header" no-label class="header" type="dump" key="shapeModule.value.enable" labelflag="shapeModule"
                 empty="true">
                 <ui-checkbox></ui-checkbox>
                 <ui-label></ui-label>
@@ -105,11 +105,11 @@ exports.template = /* html*/`
             <ui-prop type="dump" key="shapeModule.value.sphericalDirectionAmount"></ui-prop>
             <ui-prop type="dump" key="shapeModule.value.randomPositionAmount"></ui-prop>
         </ui-section>
-        <ui-section class="config" key="velocityOvertimeModule" autoflag="true" cache-expand="particle-system-velocityOvertimeModule"></ui-section>
-        <ui-section class="config" key="forceOvertimeModule" autoflag="true" cache-expand="particle-system-forceOvertimeModule"></ui-section>
-        <ui-section empty="true" class="config" key="sizeOvertimeModule"
+        <ui-section key="velocityOvertimeModule" autoflag="true" cache-expand="particle-system-velocityOvertimeModule"></ui-section>
+        <ui-section key="forceOvertimeModule" autoflag="true" cache-expand="particle-system-forceOvertimeModule"></ui-section>
+        <ui-section empty="true" key="sizeOvertimeModule"
             cache-expand="particle-system-sizeOvertimeModule">
-            <ui-prop slot="header" class="header" type="dump" key="sizeOvertimeModule.value.enable"
+            <ui-prop slot="header" no-label class="header" type="dump" key="sizeOvertimeModule.value.enable"
                 labelflag="sizeOvertimeModule" empty="true">
                 <ui-checkbox></ui-checkbox>
                 <ui-label></ui-label>
@@ -120,9 +120,9 @@ exports.template = /* html*/`
             <ui-prop type="dump" key="sizeOvertimeModule.value.y"></ui-prop>
             <ui-prop type="dump" key="sizeOvertimeModule.value.z"></ui-prop>
         </ui-section>
-        <ui-section empty="true" class="config" key="rotationOvertimeModule"
+        <ui-section empty="true" key="rotationOvertimeModule"
             cache-expand="particle-system-rotationOvertimeModule">
-            <ui-prop slot="header" class="header" type="dump" key="rotationOvertimeModule.value.enable"
+            <ui-prop slot="header" no-label class="header" type="dump" key="rotationOvertimeModule.value.enable"
                 labelflag="rotationOvertimeModule" empty="true">
                 <ui-checkbox></ui-checkbox>
                 <ui-label></ui-label>
@@ -132,13 +132,13 @@ exports.template = /* html*/`
             <ui-prop type="dump" key="rotationOvertimeModule.value.y"></ui-prop>
             <ui-prop type="dump" key="rotationOvertimeModule.value.z"></ui-prop>
         </ui-section>
-        <ui-section class="config" key="colorOverLifetimeModule" autoflag="true"
+        <ui-section key="colorOverLifetimeModule" autoflag="true"
             cache-expand="particle-system-colorOverLifetimeModule"></ui-section>
-        <ui-section class="config" key="textureAnimationModule" autoflag="true"
+        <ui-section key="textureAnimationModule" autoflag="true"
             cache-expand="particle-system-textureAnimationModule"></ui-section>
-        <ui-section type="dump" showflag="!renderer.value.useGPU" key="limitVelocityOvertimeModule" class="config"
+        <ui-section type="dump" showflag="!renderer.value.useGPU" key="limitVelocityOvertimeModule"
             cache-expand="particle-system-limitVelocityOvertimeModule">
-            <ui-prop slot="header" class="header" type="dump" key="limitVelocityOvertimeModule.value.enable"
+            <ui-prop slot="header" no-label class="header" type="dump" key="limitVelocityOvertimeModule.value.enable"
                 labelflag="limitVelocityOvertimeModule" empty="true">
                 <ui-checkbox></ui-checkbox>
                 <ui-label></ui-label>
@@ -151,9 +151,9 @@ exports.template = /* html*/`
             <ui-prop type="dump" key="limitVelocityOvertimeModule.value.limitY"></ui-prop>
             <ui-prop type="dump" key="limitVelocityOvertimeModule.value.limitZ"></ui-prop>
         </ui-section>
-        <ui-section empty="true" class="config" showflag="!renderer.value.useGPU" key="trailModule"
+        <ui-section empty="true" showflag="!renderer.value.useGPU" key="trailModule"
             cache-expand="particle-system-trailModule">
-            <ui-prop slot="header" class="header" type="dump" key="trailModule.value.enable" labelflag="trailModule"
+            <ui-prop slot="header" no-label class="header" type="dump" key="trailModule.value.enable" labelflag="trailModule"
                 empty="true">
                 <ui-checkbox></ui-checkbox>
                 <ui-label></ui-label>
@@ -202,41 +202,6 @@ exports.methods = {
         } else {
             return target;
         }
-    },
-    /**
-     * Get the name based on the dump data
-     */
-    getName(value) {
-        if (!value) {
-            return '';
-        }
-
-        if (value.displayName) {
-            return value.displayName;
-        }
-
-        let name = value.name || '';
-
-        name = name.replace(/^\S/, (str) => str.toUpperCase());
-        name = name.replace(/_/g, (str) => ' ');
-        name = name.replace(/ \S/g, (str) => ` ${str.toUpperCase()}`);
-
-        return name.trim();
-    },
-
-    /**
-     * Get tooltip based on dump data
-     * @param value
-     */
-    getTitle(value) {
-        if (value.tooltip) {
-            if (!value.tooltip.startsWith('i18n:')) {
-                return value.tooltip;
-            }
-            return Editor.I18n.t(`ENGINE.${value.tooltip.substr(5)}`) || value.tooltip;
-        }
-
-        return this.getName(value);
     },
 
     getEnumName(type, value) {
@@ -372,26 +337,28 @@ const uiElements = {
 
                     const header = document.createElement('ui-prop');
                     header.setAttribute('slot', 'header');
+                    header.setAttribute('no-label', '');
                     header.setAttribute('type', 'dump');
                     header.setAttribute('empty', 'true');
                     header.className = 'header';
-                    header.dump = this.getObjectByKey(this.dump.value, key);
+                    const dump = this.getObjectByKey(this.dump.value, key);
+                    header.dump = dump;
                     const checkbox = document.createElement('ui-checkbox');
                     checkbox.changeEvent = (event) => {
-                        this.getObjectByKey(this.dump.value, key).value.enable.value = event.target.value;
+                        dump.value.enable.value = event.target.value;
                         header.dispatch('change-dump');
                     };
                     checkbox.addEventListener('change', checkbox.changeEvent);
-                    checkbox.setAttribute('value', this.getObjectByKey(this.dump.value, key).value.enable.value);
+                    checkbox.setAttribute('value', dump.value.enable.value);
                     const label = document.createElement('ui-label');
-                    label.setAttribute('value', this.getName(this.getObjectByKey(this.dump.value, key)));
-                    label.setAttribute('tooltip', this.getTitle(this.getObjectByKey(this.dump.value, key)));
+                    label.setAttribute('value', propUtils.getName(dump));
+                    label.setAttribute('tooltip', dump.tooltip);
                     header.replaceChildren(...[checkbox, label]);
                     children.push(header);
-                    const propMap = this.getObjectByKey(this.dump.value, key).value;
+                    const propMap = dump.value;
 
                     for (const propKey in propMap) {
-                        const dump = propMap[propKey];
+                        const propDump = propMap[propKey];
                         if (propKey === 'enable') {
                             continue;
                         }
@@ -399,9 +366,9 @@ const uiElements = {
                         const uiProp = oldProp || document.createElement('ui-prop');
                         uiProp.setAttribute('type', 'dump');
                         uiProp.setAttribute('key', propKey);
-                        const isShow = dump.visible;
+                        const isShow = propDump.visible;
                         if (isShow) {
-                            uiProp.render(dump);
+                            uiProp.render(propDump);
                             children.push(uiProp);
                         }
                     }
@@ -409,7 +376,7 @@ const uiElements = {
                     children.forEach((newChild, index) => {
                         const oldChild = oldChildren[index];
                         if (oldChild === newChild) {
-                            return true;
+                            return;
                         }
                         if (oldChild) {
                             oldChild.replaceWith(newChild);
@@ -615,8 +582,8 @@ const uiElements = {
                         const labelflag = element.getAttribute('labelflag');
                         if (labelflag) {
                             const dump = this.getObjectByKey(this.dump.value, labelflag);
-                            label.setAttribute('value', this.getName(dump));
-                            label.setAttribute('tooltip', this.getTitle(dump));
+                            label.setAttribute('value', propUtils.getName(dump));
+                            label.setAttribute('tooltip', dump.tooltip);
                         }
                     }
                     if (isHeader) {

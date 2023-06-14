@@ -40,12 +40,15 @@ public:
     void endRenderPass() override;
     void nextSubpass() override;
     void draw(const DrawInfo &info) override;
+    void drawIndirect(Buffer *buffer, uint32_t offset, uint32_t count, uint32_t stride) override;
+    void drawIndexedIndirect(Buffer *buffer, uint32_t offset, uint32_t count, uint32_t stride) override;
     void setViewport(const Viewport &vp) override;
     void setScissor(const Rect &rect) override;
     void updateBuffer(Buffer *buff, const void *data, uint32_t size) override;
     void copyBuffersToTexture(const uint8_t *const *buffers, Texture *texture, const BufferTextureCopy *regions, uint32_t count) override;
     void blitTexture(Texture *srcTexture, Texture *dstTexture, const TextureBlit *regions, uint32_t count, Filter filter) override;
     void copyTexture(Texture *srcTexture, Texture *dstTexture, const TextureCopy *regions, uint32_t count) override;
+    void copyBuffer(Buffer *srcBuffer, Buffer *dstBuffer, const BufferCopy *regions, uint32_t count) override;
     void execute(CommandBuffer *const *cmdBuffs, uint32_t count) override;
 
 protected:

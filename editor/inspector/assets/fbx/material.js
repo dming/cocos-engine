@@ -27,9 +27,7 @@ exports.template = /* html */`
 `;
 
 exports.style = /* css */`
-ui-prop,
-.images
-ui-section {
+.images {
     margin: 4px 0;
 }
 
@@ -157,7 +155,7 @@ const Elements = {
         update() {
             const panel = this;
 
-            panel.$.useVertexColorsCheckbox.value = panel.getDefault(panel.meta.userData.useVertexColors, true);
+            panel.$.useVertexColorsCheckbox.value = panel.getDefault(panel.meta.userData.useVertexColors, false);
 
             updateElementInvalid.call(panel, panel.$.useVertexColorsCheckbox, 'useVertexColors');
             updateElementReadonly.call(panel, panel.$.useVertexColorsCheckbox);
@@ -276,10 +274,9 @@ const Elements = {
                         }
                         url = asset.source;
                     }
-
                     image.remapUuid = uuid;
                     image.remap = url;
-                    panel.meta.userData.imageMetas[index].remap = url;
+                    panel.meta.userData.imageMetas[index].remap = uuid;
 
                     const remapAsPropContentImg = remapAsPropContent.querySelector('.image');
 

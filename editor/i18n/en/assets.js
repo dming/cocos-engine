@@ -194,6 +194,7 @@ module.exports = {
             wrapModeTTip: 'Texture addressing mode in T(V) direction',
             modeWarn:
                 "Warning: WebGL 1.0 platform doesn't support 'Repeat' filter for non-power-of-two textures(runtime fallback to 'Clamp'), effectively disabling features like the 'tilingOffset' property in many materials.",
+            filterDiffenent: 'Filter settings do not match the configuration in {atlasFile} and may not take effect.',
         },
         fbx: {
             browse: 'Change Target',
@@ -285,6 +286,9 @@ module.exports = {
                     name: 'Skip Validation',
                     title: 'Skip validation of the model file.',
                 },
+                mountAllAnimationsOnPrefab: {
+                    name: 'Mount All Animations Onto Prefab',
+                },
             },
             addEvent: {
                 shouldSave: 'The newly created clip needs to be submitted for modification before adding/editing events',
@@ -318,6 +322,10 @@ module.exports = {
                 title:
                     'Indicate whether the mesh data in this model could be read or write.<br>' +
                     'If it is unchecked, the mesh data will be released after it is uploaded to GPU',
+            },
+            addVertexColor: {
+                name: 'Add Vertex Color',
+                title: 'Fill vertex color with white if the model file does not contain vertex color attribute.',
             },
             meshOptimizer: {
                 name: 'Mesh Optimizer',
@@ -428,6 +436,20 @@ module.exports = {
                 name: 'Smart Material Conversion',
                 title: 'Convert DCC materials to engine builtin materials which match the internal lighting model.',
                 warn: 'The model feature "Smart Material Conversion" in the project settings is turned off, please enable this feature to modify model level settings.',
+            },
+            animationSetting: {
+                additive: {
+                    header: 'Additive Animation Import Setting',
+                    enabled: {
+                        label: 'Import As Additive',
+                        tooltip: 'if checked, import this animation as additive animation.',
+                    },
+                    refClip: {
+                        label: 'Reference Clip',
+                        tooltip: 'If set, computation of the additive animation with reference pose at first frame of specified clip. ' +
+                            'Otherwise, reference the pose at first frame of original clip.',
+                    },
+                },
             },
         },
         textureCube: {

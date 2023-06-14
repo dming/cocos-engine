@@ -31,15 +31,13 @@ import {
     type,
     tooltip,
 } from 'cc.decorator';
-import { EDITOR } from 'internal:constants';
+import { EDITOR_NOT_IN_PREVIEW } from 'internal:constants';
 import { Constraint } from './constraint';
-import { Vec3, cclegacy, CCFloat, CCBoolean } from '../../../../core';
+import { Vec3, CCFloat, CCBoolean } from '../../../../core';
 import { EConstraintType } from '../../physics-enum';
 import { IHingeConstraint } from '../../../spec/i-physics-constraint';
 
 @ccclass('cc.HingeLimitData')
-@help('i18n:cc.HingeLimitData')
-@menu('Physics/HingeLimitData')
 export class HingeLimitData {
     @serializable
     @formerlySerializedAs('enabled')
@@ -99,8 +97,6 @@ export class HingeLimitData {
 }
 
 @ccclass('cc.HingeMotorData')
-@help('i18n:cc.HingeMotorData')
-@menu('Physics/HingeMotorData')
 export class HingeMotorData {
     @serializable
     @formerlySerializedAs('enabled')
@@ -177,7 +173,7 @@ export class HingeConstraint extends Constraint {
 
     set pivotA (v: Vec3) {
         Vec3.copy(this._pivotA, v);
-        if (!EDITOR || cclegacy.GAME_VIEW) {
+        if (!EDITOR_NOT_IN_PREVIEW) {
             this.constraint.setPivotA(this._pivotA);
         }
     }
@@ -196,7 +192,7 @@ export class HingeConstraint extends Constraint {
 
     set pivotB (v: Vec3) {
         Vec3.copy(this._pivotB, v);
-        if (!EDITOR || cclegacy.GAME_VIEW) {
+        if (!EDITOR_NOT_IN_PREVIEW) {
             this.constraint.setPivotB(this._pivotB);
         }
     }
@@ -215,7 +211,7 @@ export class HingeConstraint extends Constraint {
 
     set axis (v: Vec3) {
         Vec3.copy(this._axis, v);
-        if (!EDITOR || cclegacy.GAME_VIEW) {
+        if (!EDITOR_NOT_IN_PREVIEW) {
             this.constraint.setAxis(this._axis);
         }
     }
@@ -232,7 +228,7 @@ export class HingeConstraint extends Constraint {
     }
     set limitEnabled (v: boolean) {
         this._limitData.enabled = v;
-        if (!EDITOR || cclegacy.GAME_VIEW) {
+        if (!EDITOR_NOT_IN_PREVIEW) {
             this.constraint.setLimitEnabled(v);
         }
     }
@@ -249,7 +245,7 @@ export class HingeConstraint extends Constraint {
     }
     set upperLimit (v: number) {
         this._limitData.upperLimit = v;
-        if (!EDITOR || cclegacy.GAME_VIEW) {
+        if (!EDITOR_NOT_IN_PREVIEW) {
             this.constraint.setUpperLimit(v);
         }
     }
@@ -266,7 +262,7 @@ export class HingeConstraint extends Constraint {
     }
     set lowerLimit (v: number) {
         this._limitData.lowerLimit = v;
-        if (!EDITOR || cclegacy.GAME_VIEW) {
+        if (!EDITOR_NOT_IN_PREVIEW) {
             this.constraint.setLowerLimit(v);
         }
     }
@@ -283,7 +279,7 @@ export class HingeConstraint extends Constraint {
     }
     set motorEnabled (v: boolean) {
         this._motorData.enabled = v;
-        if (!EDITOR || cclegacy.GAME_VIEW) {
+        if (!EDITOR_NOT_IN_PREVIEW) {
             this.constraint.setMotorEnabled(v);
         }
     }
@@ -300,7 +296,7 @@ export class HingeConstraint extends Constraint {
     }
     set motorVelocity (v: number) {
         this._motorData.motorVelocity = v;
-        if (!EDITOR || cclegacy.GAME_VIEW) {
+        if (!EDITOR_NOT_IN_PREVIEW) {
             this.constraint.setMotorVelocity(v);
         }
     }
@@ -317,7 +313,7 @@ export class HingeConstraint extends Constraint {
     }
     set motorForceLimit (v: number) {
         this._motorData.motorForceLimit = v;
-        if (!EDITOR || cclegacy.GAME_VIEW) {
+        if (!EDITOR_NOT_IN_PREVIEW) {
             this.constraint.setMotorForceLimit(v);
         }
     }

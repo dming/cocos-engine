@@ -35,7 +35,6 @@
 #include "LayoutGraphUtils.h"
 #include "NativePipelineTypes.h"
 #include "ProgramLib.h"
-#include "ProgramUtils.h"
 #include "base/Ptr.h"
 #include "cocos/base/Log.h"
 #include "cocos/core/assets/EffectAsset.h"
@@ -74,7 +73,7 @@ constexpr uint32_t setIndex(UpdateFrequency rate) {
 
 constexpr auto INVALID_ID = LayoutGraphData::null_vertex();
 
-std::tuple<uint32_t, uint32_t, const IShaderInfo *, uint32_t>
+std::tuple<uint32_t, uint32_t, uint32_t, const IShaderInfo *, uint32_t>
 getEffectShader(
     const LayoutGraphData &lg,
     const EffectAsset &effect, const IPassInfo &pass) {
@@ -87,18 +86,27 @@ getEffectShader(
     }
     if (passID == INVALID_ID) {
         CC_LOG_ERROR("Invalid render pass");
-        return {INVALID_ID, INVALID_ID, nullptr, INVALID_ID};
+        return {INVALID_ID, INVALID_ID, INVALID_ID, nullptr, INVALID_ID};
+    }
+
+    auto subpassID = INVALID_ID;
+    if (pass.subpass) {
+        subpassID = locate(passID, *pass.subpass, lg);
+        if (subpassID == INVALID_ID) {
+            CC_LOG_ERROR("Invalid render subpass");
+            return {INVALID_ID, INVALID_ID, INVALID_ID, nullptr, INVALID_ID};
+        }
     }
 
     auto phaseID = INVALID_ID;
     if (pass.phase) {
-        phaseID = locate(passID, *pass.phase, lg);
+        phaseID = locate(subpassID == INVALID_ID ? passID : subpassID, *pass.phase, lg);
     } else {
-        phaseID = locate(passID, "default", lg);
+        phaseID = locate(subpassID == INVALID_ID ? passID : subpassID, "default", lg);
     }
     if (phaseID == INVALID_ID) {
         CC_LOG_ERROR("Invalid render phase");
-        return {INVALID_ID, INVALID_ID, nullptr, INVALID_ID};
+        return {INVALID_ID, INVALID_ID, INVALID_ID, nullptr, INVALID_ID};
     }
 
     const IShaderInfo *srcShaderInfo = nullptr;
@@ -111,7 +119,7 @@ getEffectShader(
             break;
         }
     }
-    return {passID, phaseID, srcShaderInfo, shaderID};
+    return {passID, subpassID, phaseID, srcShaderInfo, shaderID};
 }
 
 int validateShaderInfo(const IShaderInfo &srcShaderInfo) {
@@ -844,104 +852,111 @@ void overwriteShaderSourceBinding(
     const gfx::ShaderInfo &shaderInfo,
     ccstd::string &source,
     boost::container::pmr::memory_resource *scratch) {
-    // find first uniform
-    auto pos = source.find(" uniform ");
-    while (pos != ccstd::string::npos) {
-        // uniform statement is separated by ";{}";
-        auto beg = source.find_last_of(";}", pos);
-        auto end = source.find_first_of(";{", pos);
-        if (beg == ccstd::string::npos) {
-            // if separator is not found, start from 0
-            beg = 0;
-        } else {
-            // bypass last separator
-            beg += 1;
-        }
-        // uniform declaration is found
-        CC_EXPECTS(beg != ccstd::string::npos);
-        CC_EXPECTS(end != ccstd::string::npos);
-        CC_ENSURES(end > beg);
 
-        // find uniform name
-        std::string_view name{};
-        {
-            std::string_view decl(source.c_str() + beg, end - beg);
-            auto nameEnd = decl.size();
-            for (; nameEnd-- > 0;) {
-                if (!std::isspace(decl[nameEnd])) {
-                    break;
+    const char* keyWords[] = {
+        " uniform ", " buffer "
+    };
+
+    for (auto &keyword : keyWords) {
+        // find first uniform
+        auto pos = source.find(keyword);
+        while (pos != ccstd::string::npos) {
+            // uniform statement is separated by ";{}";
+            auto beg = source.find_last_of(";}", pos);
+            auto end = source.find_first_of(";{", pos);
+            if (beg == ccstd::string::npos) {
+                // if separator is not found, start from 0
+                beg = 0;
+            } else {
+                // bypass last separator
+                beg += 1;
+            }
+            // uniform declaration is found
+            CC_EXPECTS(beg != ccstd::string::npos);
+            CC_EXPECTS(end != ccstd::string::npos);
+            CC_ENSURES(end > beg);
+
+            // find uniform name
+            std::string_view name{};
+            {
+                std::string_view decl(source.c_str() + beg, end - beg);
+                auto nameEnd = decl.size();
+                for (; nameEnd-- > 0;) {
+                    if (!std::isspace(decl[nameEnd])) {
+                        break;
+                    }
+                }
+                auto nameBeg = decl.find_last_of(' ', nameEnd);
+                nameBeg += 1;
+                nameEnd += 1;
+                // uniform name found
+                name = decl.substr(nameBeg, nameEnd - nameBeg);
+            }
+            CC_ENSURES(!name.empty());
+
+            // layout
+            std::ptrdiff_t offset = 0;
+            {
+                std::string_view prevLayout;
+                // find layout expression
+                auto layoutBeg = source.rfind("layout", pos);
+                auto layoutEnd = ccstd::string::npos;
+                if (layoutBeg == ccstd::string::npos || layoutBeg < beg) {
+                    // layout not found
+                    layoutBeg = ccstd::string::npos;
+                    CC_ENSURES(layoutBeg == ccstd::string::npos);
+                    CC_ENSURES(layoutEnd == ccstd::string::npos);
+                } else {
+                    CC_EXPECTS(layoutBeg >= beg && layoutBeg <= end);
+                    layoutEnd = source.find(')', layoutBeg) + 1;
+                    CC_EXPECTS(layoutEnd != ccstd::string::npos);
+                    CC_ENSURES(layoutBeg < layoutEnd && layoutEnd <= end);
+                    prevLayout = std::string_view(source.c_str() + layoutBeg, layoutEnd - layoutBeg);
+
+                    // check layout expression is within uniform declaration
+                    // prev layout expression is from layoutBeg to layoutEnd
+                    CC_ENSURES(layoutBeg >= beg && layoutBeg <= end);
+                    CC_ENSURES(layoutEnd >= layoutBeg && layoutEnd <= end);
+                }
+
+                // find uniform set and binding
+                auto [set, binding] = findBinding(shaderInfo, name);
+
+                // compose new layout expression
+                ccstd::pmr::string newLayout(scratch);
+                newLayout.reserve(32);
+                newLayout.append("layout(set = ");
+                newLayout.append(std::to_string(set));
+                newLayout.append(", binding = ");
+                newLayout.append(std::to_string(binding));
+
+                auto inputIndex = prevLayout.find("input_attachment_index");
+                if (inputIndex != ccstd::string::npos) {
+                    newLayout.append(", ");
+                    auto endIndex = prevLayout.find_first_of(",)", inputIndex + 1);
+                    newLayout.append(prevLayout.data(), inputIndex, endIndex - inputIndex);
+                }
+
+                newLayout.append(")");
+
+                // replace layout expression
+                if (layoutBeg == ccstd::string::npos) { // layout not found
+                    source.insert(pos, newLayout);
+                    offset = static_cast<std::ptrdiff_t>(newLayout.size());
+                } else {
+                    // layout is found
+                    source.erase(layoutBeg, prevLayout.size());
+                    source.insert(layoutBeg, newLayout);
+                    // calculate string difference
+                    offset = static_cast<std::ptrdiff_t>(newLayout.size()) -
+                             static_cast<std::ptrdiff_t>(prevLayout.size());
                 }
             }
-            auto nameBeg = decl.find_last_of(' ', nameEnd);
-            nameBeg += 1;
-            nameEnd += 1;
-            // uniform name found
-            name = decl.substr(nameBeg, nameEnd - nameBeg);
+            // offset end of uniform declaration, offset is caused by modification of layout
+            end += offset;
+            // find next uniform
+            pos = source.find(keyword, end);
         }
-        CC_ENSURES(!name.empty());
-
-        // layout
-        std::ptrdiff_t offset = 0;
-        {
-            std::string_view prevLayout;
-            // find layout expression
-            auto layoutBeg = source.rfind("layout", pos);
-            auto layoutEnd = ccstd::string::npos;
-            if (layoutBeg == ccstd::string::npos || layoutBeg < beg) {
-                // layout not found
-                layoutBeg = ccstd::string::npos;
-                CC_ENSURES(layoutBeg == ccstd::string::npos);
-                CC_ENSURES(layoutEnd == ccstd::string::npos);
-            } else {
-                CC_EXPECTS(layoutBeg >= beg && layoutBeg <= end);
-                layoutEnd = source.find(')', layoutBeg) + 1;
-                CC_EXPECTS(layoutEnd != ccstd::string::npos);
-                CC_ENSURES(layoutBeg < layoutEnd && layoutEnd <= end);
-                prevLayout = std::string_view(source.c_str() + layoutBeg, layoutEnd - layoutBeg);
-
-                // check layout expression is within uniform declaration
-                // prev layout expression is from layoutBeg to layoutEnd
-                CC_ENSURES(layoutBeg >= beg && layoutBeg <= end);
-                CC_ENSURES(layoutEnd >= layoutBeg && layoutEnd <= end);
-            }
-
-            // find uniform set and binding
-            auto [set, binding] = findBinding(shaderInfo, name);
-
-            // compose new layout expression
-            ccstd::pmr::string newLayout(scratch);
-            newLayout.reserve(32);
-            newLayout.append("layout(set = ");
-            newLayout.append(std::to_string(set));
-            newLayout.append(", binding = ");
-            newLayout.append(std::to_string(binding));
-
-            auto inputIndex = prevLayout.find("input_attachment_index");
-            if (inputIndex != ccstd::string::npos) {
-                newLayout.append(", ");
-                auto endIndex = prevLayout.find_first_of(",)", inputIndex + 1);
-                newLayout.append(prevLayout.data(), inputIndex, endIndex - inputIndex);
-            }
-
-            newLayout.append(")");
-
-            // replace layout expression
-            if (layoutBeg == ccstd::string::npos) { // layout not found
-                source.insert(pos, newLayout);
-                offset = static_cast<std::ptrdiff_t>(newLayout.size());
-            } else {
-                // layout is found
-                source.erase(layoutBeg, prevLayout.size());
-                source.insert(layoutBeg, newLayout);
-                // calculate string difference
-                offset = static_cast<std::ptrdiff_t>(newLayout.size()) -
-                         static_cast<std::ptrdiff_t>(prevLayout.size());
-            }
-        }
-        // offset end of uniform declaration, offset is caused by modification of layout
-        end += offset;
-        // find next uniform
-        pos = source.find(" uniform ", end);
     }
 }
 
@@ -964,6 +979,9 @@ void overwriteShaderProgramBinding(
 
     overwriteShaderSourceBinding(shaderInfo, src->vert, scratch);
     overwriteShaderSourceBinding(shaderInfo, src->frag, scratch);
+    if (src->compute) {
+        overwriteShaderSourceBinding(shaderInfo, src->compute.value(), scratch);
+    }
 }
 
 // overwrite IProgramInfo using gfx.ShaderInfo
@@ -994,7 +1012,7 @@ void overwriteProgramBlockInfo(
 
 gfx::DescriptorSetLayout *getDescriptorSetLayout(
     const LayoutGraphData &lg,
-    uint32_t passID, uint32_t phaseID, UpdateFrequency rate) { // NOLINT(bugprone-easily-swappable-parameters)
+    uint32_t subpassOrPassID, uint32_t phaseID, UpdateFrequency rate) { // NOLINT(bugprone-easily-swappable-parameters)
     if (rate < UpdateFrequency::PER_PASS) {
         const auto &phaseData = get(LayoutGraphData::LayoutTag{}, lg, phaseID);
         auto iter = phaseData.descriptorSets.find(rate);
@@ -1010,9 +1028,9 @@ gfx::DescriptorSetLayout *getDescriptorSetLayout(
     }
 
     CC_EXPECTS(rate == UpdateFrequency::PER_PASS);
-    CC_EXPECTS(passID == parent(phaseID, lg));
+    CC_EXPECTS(subpassOrPassID == parent(phaseID, lg));
 
-    const auto &passData = get(LayoutGraphData::LayoutTag{}, lg, passID);
+    const auto &passData = get(LayoutGraphData::LayoutTag{}, lg, subpassOrPassID);
     auto iter = passData.descriptorSets.find(rate);
     if (iter != passData.descriptorSets.end()) {
         const auto &data = iter->second;
@@ -1054,7 +1072,7 @@ gfx::DescriptorSetLayout *getProgramDescriptorSetLayout(
 const gfx::DescriptorSetLayout &getOrCreateDescriptorSetLayout(
     const NativeProgramLibrary &lib,
     const LayoutGraphData &lg,
-    uint32_t passID, uint32_t phaseID, UpdateFrequency rate) { // NOLINT(bugprone-easily-swappable-parameters)
+    uint32_t subpassOrPassID, uint32_t phaseID, UpdateFrequency rate) { // NOLINT(bugprone-easily-swappable-parameters)
     if (rate < UpdateFrequency::PER_PASS) {
         const auto &phaseData = get(LayoutGraphData::LayoutTag{}, lg, phaseID);
         auto iter = phaseData.descriptorSets.find(rate);
@@ -1070,9 +1088,9 @@ const gfx::DescriptorSetLayout &getOrCreateDescriptorSetLayout(
     }
 
     CC_EXPECTS(rate == UpdateFrequency::PER_PASS);
-    CC_EXPECTS(passID == parent(phaseID, lg));
+    CC_EXPECTS(subpassOrPassID == parent(phaseID, lg));
 
-    const auto &passData = get(LayoutGraphData::LayoutTag{}, lg, passID);
+    const auto &passData = get(LayoutGraphData::LayoutTag{}, lg, subpassOrPassID);
     const auto iter = passData.descriptorSets.find(rate);
     if (iter != passData.descriptorSets.end()) {
         const auto &data = iter->second;
@@ -1127,7 +1145,7 @@ void populatePipelineLayoutInfo(
 }
 
 template <typename T>
-static ccstd::hash_t getShaderHash(ccstd::hash_t src, const T &val) {
+ccstd::hash_t getShaderHash(ccstd::hash_t src, const T &val) {
     if (src != gfx::INVALID_SHADER_HASH) {
         ccstd::hash_combine(src, val);
     }
@@ -1183,8 +1201,8 @@ void NativeProgramLibrary::init(gfx::Device *deviceIn) {
             continue;
         }
         const auto phaseID = v;
-        const auto passID = parent(phaseID, lg);
-        const auto &passLayout = get(LayoutGraphData::LayoutTag{}, lg, passID);
+        const auto subpassOrPassID = parent(phaseID, lg);
+        const auto &passLayout = get(LayoutGraphData::LayoutTag{}, lg, subpassOrPassID);
         const auto &phaseLayout = get(LayoutGraphData::LayoutTag{}, lg, phaseID);
         gfx::PipelineLayoutInfo info;
         populatePipelineLayoutInfo(*this, passLayout, UpdateFrequency::PER_PASS, info);
@@ -1237,16 +1255,17 @@ void NativeProgramLibrary::addEffect(const EffectAsset *effectAssetIn) {
     for (const auto &tech : effect._techniques) {
         for (const auto &pass : tech.passes) {
             const auto &programName = pass.program;
-            const auto [passID, phaseID, pShaderInfo, shaderID] =
+            const auto [passID, subpassID, phaseID, pShaderInfo, shaderID] =
                 getEffectShader(lg, effect, pass);
             if (pShaderInfo == nullptr || validateShaderInfo(*pShaderInfo)) {
                 CC_LOG_ERROR("program not found");
                 continue;
             }
+            const auto subpassOrPassID = subpassID == INVALID_ID ? passID : subpassID;
             const auto &srcShaderInfo = *pShaderInfo;
-            CC_ENSURES(passID != INVALID_ID && phaseID != INVALID_ID);
-            const auto &passLayout = get(LayoutGraphData::LayoutTag{}, lg, passID);
-            const auto &phaseLayout = get(LayoutGraphData::LayoutTag{}, lg, phaseID);
+            CC_ENSURES(subpassOrPassID != INVALID_ID && phaseID != INVALID_ID);
+            const auto &passLayout = get(LayoutGraphData::LayoutTag{}, lg, subpassOrPassID);
+            const auto &phaseLayout = get(LayoutGraphData::LayoutTag{}, lg, subpassOrPassID);
 
             // programs
             auto iter = this->phases.find(phaseID);
@@ -1355,13 +1374,13 @@ IntrusivePtr<gfx::PipelineLayout> NativeProgramLibrary::getPipelineLayout(
     }
 
     // get pass
-    const auto passID = parent(phaseID, lg);
-    if (passID == LayoutGraphData::null_vertex()) {
+    const auto subpassOrPassID = parent(phaseID, lg);
+    if (subpassOrPassID == LayoutGraphData::null_vertex()) {
         return emptyPipelineLayout;
     }
     // create pipeline layout
     gfx::PipelineLayoutInfo info{};
-    auto *passSet = getDescriptorSetLayout(lg, passID, phaseID, UpdateFrequency::PER_PASS);
+    auto *passSet = getDescriptorSetLayout(lg, subpassOrPassID, phaseID, UpdateFrequency::PER_PASS);
     if (passSet) {
         info.setLayouts.emplace_back(passSet);
     }
@@ -1375,7 +1394,7 @@ IntrusivePtr<gfx::PipelineLayout> NativeProgramLibrary::getPipelineLayout(
     if (instanceSet) {
         info.setLayouts.emplace_back(instanceSet);
     }
-    auto *phaseSet = getDescriptorSetLayout(lg, passID, phaseID, UpdateFrequency::PER_PHASE);
+    auto *phaseSet = getDescriptorSetLayout(lg, subpassOrPassID, phaseID, UpdateFrequency::PER_PHASE);
     if (phaseSet) {
         info.setLayouts.emplace_back(phaseSet);
     }
@@ -1387,9 +1406,9 @@ const gfx::DescriptorSetLayout &NativeProgramLibrary::getMaterialDescriptorSetLa
     gfx::Device *device, uint32_t phaseID, const ccstd::string &programName) {
     if (mergeHighFrequency) {
         CC_EXPECTS(phaseID != LayoutGraphData::null_vertex());
-        const auto passID = parent(phaseID, layoutGraph);
+        const auto subpassOrPassID = parent(phaseID, layoutGraph);
         return getOrCreateDescriptorSetLayout(
-            *this, layoutGraph, passID, phaseID, UpdateFrequency::PER_BATCH);
+            *this, layoutGraph, subpassOrPassID, phaseID, UpdateFrequency::PER_BATCH);
     }
     return getOrCreateProgramDescriptorSetLayout(
         *this, device, layoutGraph, phaseID, programName, UpdateFrequency::PER_BATCH);
@@ -1399,9 +1418,9 @@ const gfx::DescriptorSetLayout &NativeProgramLibrary::getLocalDescriptorSetLayou
     gfx::Device *device, uint32_t phaseID, const ccstd::string &programName) {
     if (mergeHighFrequency) {
         CC_EXPECTS(phaseID != LayoutGraphData::null_vertex());
-        const auto passID = parent(phaseID, layoutGraph);
+        const auto subpassOrPassID = parent(phaseID, layoutGraph);
         return getOrCreateDescriptorSetLayout(
-            *this, layoutGraph, passID, phaseID, UpdateFrequency::PER_INSTANCE);
+            *this, layoutGraph, subpassOrPassID, phaseID, UpdateFrequency::PER_INSTANCE);
     }
     if (fixedLocal) {
         return *localDescriptorSetLayout;
@@ -1545,7 +1564,7 @@ gfx::PipelineState *NativeProgramLibrary::getComputePipelineState(
     return native->pipelineState.get();
 }
 
-const ccstd::vector<int32_t> &NativeProgramLibrary::getBlockSizes(
+const ccstd::vector<int> &NativeProgramLibrary::getBlockSizes(
     uint32_t phaseID, const ccstd::string &programName) const {
     CC_EXPECTS(phaseID != LayoutGraphData::null_vertex());
     const auto &group = phases.at(phaseID);

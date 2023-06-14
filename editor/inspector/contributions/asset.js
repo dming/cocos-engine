@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { injectionStyle } = require('../utils/prop');
 const History = require('./asset-history/index');
 
 const showImage = ['image', 'texture', 'sprite-frame', 'gltf-mesh'];
@@ -20,7 +21,7 @@ exports.template = `
         <ui-button class="reset tiny red transparent" tooltip="i18n:ENGINE.assets.reset">
             <ui-icon value="reset"></ui-icon>
         </ui-button>
-        <ui-button type="icon" class="copy transparent" tooltip="i18n:ENGINE.inspector.cloneToEdit">
+        <ui-button class="copy transparent" tooltip="i18n:ENGINE.inspector.cloneToEdit">
             <ui-icon value="copy"></ui-icon>
         </ui-button>
         <ui-link value="" class="help" tooltip="i18n:ENGINE.menu.help_url">
@@ -310,6 +311,7 @@ const Elements = {
                     const file = list[i];
                     if (!contentRender.__panels__[i]) {
                         contentRender.__panels__[i] = document.createElement('ui-panel');
+                        contentRender.__panels__[i].injectionStyle(injectionStyle);
                         contentRender.__panels__[i].addEventListener('change', () => {
                             Elements.header.isDirty.call(panel);
                         });
@@ -330,7 +332,7 @@ const Elements = {
                 try {
                     await Promise.all(
                         contentRender.__panels__.map(($panel) => {
-                            $panel.injectionStyle(`ui-prop { margin-top: 5px; }`);
+                            $panel.injectionStyle(injectionStyle);
                             return $panel.update(panel.assetList, panel.metaList);
                         }),
                     );

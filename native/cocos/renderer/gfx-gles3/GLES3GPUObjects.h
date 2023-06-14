@@ -43,6 +43,7 @@ struct GLES3GPUConstantRegistry {
 
     MSRTSupportLevel mMSRT{MSRTSupportLevel::NONE};
     FBFSupportLevel mFBF{FBFSupportLevel::NONE};
+    uint32_t multiDrawIndirect = false;
 };
 
 class GLES3GPUStateCache;
@@ -116,7 +117,6 @@ struct GLES3GPUBuffer {
     GLuint glBuffer = 0;
     GLuint glOffset = 0;
     uint8_t *buffer = nullptr;
-    DrawInfoList indirects;
 };
 using GLES3GPUBufferList = ccstd::vector<GLES3GPUBuffer *>;
 
@@ -306,7 +306,6 @@ struct GLES3GPUInputAssembler {
     AttributeList attributes;
     GLES3GPUBufferList gpuVertexBuffers;
     GLES3GPUBuffer *gpuIndexBuffer = nullptr;
-    GLES3GPUBuffer *gpuIndirectBuffer = nullptr;
     GLES3GPUAttributeList glAttribs;
     GLenum glIndexType = 0;
     ccstd::unordered_map<size_t, GLuint> glVAOs;
@@ -320,21 +319,18 @@ struct GLES3GPUGeneralBarrier {
     GLbitfield glBarriersByRegion = 0U;
 };
 
+using DrawBuffer = std::vector<GLenum>;
 struct GLES3GPURenderPass {
-    struct AttachmentStatistics {
-        uint32_t loadSubpass{SUBPASS_EXTERNAL};
-        uint32_t storeSubpass{SUBPASS_EXTERNAL};
-    };
-
     ColorAttachmentList colorAttachments;
     DepthStencilAttachment depthStencilAttachment;
     SubpassInfoList subpasses;
     SubpassDependencyList dependencies;
 
-    ccstd::vector<AttachmentStatistics> statistics; // per attachment
-
-    ccstd::vector<GLES3GPUGeneralBarrier> subpassBarriers; // per subpass
-    GLES3GPUGeneralBarrier blockBarrier;
+    std::vector<uint32_t> colors;
+    std::vector<uint32_t> resolves;
+    uint32_t depthStencil = INVALID_BINDING;
+    std::vector<uint32_t> indices; // offsets to GL_COLOR_ATTACHMENT_0
+    std::vector<DrawBuffer> drawBuffers;
 };
 
 class GLES3GPUFramebufferCacheMap;
@@ -343,7 +339,6 @@ public:
     GLES3GPURenderPass *gpuRenderPass{nullptr};
     GLES3GPUTextureViewList gpuColorViews;
     GLES3GPUTextureView *gpuDepthStencilView{nullptr};
-    bool usesFBF{false};
 
     struct GLFramebufferInfo {
         GLuint glFramebuffer{0U};
@@ -380,16 +375,7 @@ public:
     };
 
     // one per subpass, if not using FBF
-    ccstd::vector<Framebuffer> instances;
-
-    ccstd::vector<uint32_t> uberColorAttachmentIndices;
-    uint32_t uberDepthStencil{INVALID_BINDING};
-    Framebuffer uberInstance;
-
-    // the assumed shader output, may differ from actual subpass output
-    // see Feature::INPUT_ATTACHMENT_BENEFIT for more details on this
-    uint32_t uberOnChipOutput{INVALID_BINDING};
-    uint32_t uberFinalOutput{INVALID_BINDING};
+    Framebuffer frameBuffer;
 };
 
 struct GLES3GPUDescriptorSetLayout {
@@ -472,6 +458,7 @@ public:
     ccstd::vector<GLuint> glBindSSBOs;
     ccstd::vector<GLuint> glBindSSBOOffsets;
     GLuint glDispatchIndirectBuffer = 0;
+    GLuint glDrawIndirectBuffer = 0;
     GLuint glVAO = 0;
     uint32_t texUint = 0;
     ccstd::vector<GLuint> glTextures;
@@ -518,6 +505,7 @@ public:
         glBindSSBOs.assign(glBindSSBOs.size(), 0U);
         glBindSSBOOffsets.assign(glBindSSBOOffsets.size(), 0U);
         glDispatchIndirectBuffer = 0;
+        glDrawIndirectBuffer = 0;
         glVAO = 0;
         texUint = 0;
         glTextures.assign(glTextures.size(), 0U);

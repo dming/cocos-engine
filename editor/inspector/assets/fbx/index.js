@@ -1,5 +1,6 @@
 'use strict';
 const path = require('path');
+const { injectionStyle } = require('../../utils/prop');
 
 exports.template = /* html */`
 <div class="asset-fbx">
@@ -17,13 +18,11 @@ exports.style = /* css */`
     display: flex;
     flex: 1;
     flex-direction: column;
-    padding-top: 5px;
 }
 
 .asset-fbx > .header {
-    text-align: center;
-    padding-bottom: 10px;
-    line-height: calc(var(--size-big-line) * 1px);
+    padding-top: 8px;
+    padding-bottom: 8px;
 }
 `;
 
@@ -82,6 +81,8 @@ const Elements = {
         ready() {
             const panel = this;
 
+            panel.$.tabPanel.injectionStyle(injectionStyle);
+
             panel.$.tabPanel.addEventListener('change', () => {
                 panel.dispatch('change');
             });
@@ -101,7 +102,7 @@ const Elements = {
 exports.methods = {
     apply() {
         Editor.Message.broadcast('fbx-inspector:apply');
-    }
+    },
 };
 
 exports.listeners = {

@@ -23,7 +23,7 @@
 */
 
 import { ccclass, serializable, editable, editorOnly } from 'cc.decorator';
-import { EDITOR, NODEJS } from 'internal:constants';
+import { EDITOR_NOT_IN_PREVIEW, NODEJS } from 'internal:constants';
 import { Root } from '../../root';
 import { BlendState, DepthStencilState, RasterizerState,
     DynamicStateFlags, PrimitiveMode, ShaderStageFlags, Type, Uniform, MemoryAccess, Format, deviceManager, ShaderInfo } from '../../gfx';
@@ -54,6 +54,7 @@ export declare namespace EffectAsset {
         dynamicStates?: DynamicStateFlags;
         phase?: string | number;
         pass?: string;
+        subpass?: string;
     }
     export interface IPassInfo extends IPassStates {
         program: string; // auto-generated from 'vert' and 'frag'
@@ -336,7 +337,7 @@ export class EffectAsset extends Asset {
             programLib.register(this);
         }
         EffectAsset.register(this);
-        if ((!EDITOR && !NODEJS) || cclegacy.GAME_VIEW) { cclegacy.game.once(cclegacy.Game.EVENT_RENDERER_INITED, this._precompile, this); }
+        if ((!EDITOR_NOT_IN_PREVIEW && !NODEJS) || cclegacy.GAME_VIEW) { cclegacy.game.once(cclegacy.Game.EVENT_RENDERER_INITED, this._precompile, this); }
     }
 
     /**

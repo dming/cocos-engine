@@ -88,6 +88,7 @@ struct RenderSwapchain {
     : swapchain(swapchainIn) {}
 
     gfx::Swapchain* swapchain{nullptr};
+    scene::RenderWindow* renderWindow{nullptr};
     uint32_t currentID{0};
     uint32_t numBackBuffers{0};
     uint32_t generation{0xFFFFFFFF};
@@ -284,7 +285,7 @@ struct RasterSubpass {
         return {rasterViews.get_allocator().resource()};
     }
 
-    RasterSubpass(uint32_t subpassIDIn, const allocator_type& alloc) noexcept;
+    RasterSubpass(uint32_t subpassIDIn, uint32_t countIn, uint32_t qualityIn, const allocator_type& alloc) noexcept;
     RasterSubpass(RasterSubpass&& rhs, const allocator_type& alloc);
     RasterSubpass(RasterSubpass const& rhs, const allocator_type& alloc);
 
@@ -295,8 +296,11 @@ struct RasterSubpass {
 
     PmrTransparentMap<ccstd::pmr::string, RasterView> rasterViews;
     PmrTransparentMap<ccstd::pmr::string, ccstd::pmr::vector<ComputeView>> computeViews;
-    uint32_t subpassID{0xFFFFFFFF};
+    ccstd::pmr::vector<ResolvePair> resolvePairs;
     gfx::Viewport viewport;
+    uint32_t subpassID{0xFFFFFFFF};
+    uint32_t count{1};
+    uint32_t quality{0};
     bool showStatistics{false};
 };
 
@@ -337,9 +341,13 @@ struct RasterPass {
 
     PmrTransparentMap<ccstd::pmr::string, RasterView> rasterViews;
     PmrTransparentMap<ccstd::pmr::string, ccstd::pmr::vector<ComputeView>> computeViews;
+    PmrTransparentMap<ccstd::pmr::string, uint32_t> attachmentIndexMap;
+    PmrTransparentMap<ccstd::pmr::string, gfx::ShaderStageFlagBit> textures;
     SubpassGraph subpassGraph;
     uint32_t width{0};
     uint32_t height{0};
+    uint32_t count{1};
+    uint32_t quality{0};
     gfx::Viewport viewport;
     ccstd::pmr::string versionName;
     uint64_t version{0};
@@ -348,8 +356,8 @@ struct RasterPass {
 };
 
 inline bool operator==(const RasterPass& lhs, const RasterPass& rhs) noexcept {
-    return std::forward_as_tuple(lhs.rasterViews, lhs.computeViews, lhs.subpassGraph, lhs.width, lhs.height) ==
-           std::forward_as_tuple(rhs.rasterViews, rhs.computeViews, rhs.subpassGraph, rhs.width, rhs.height);
+    return std::forward_as_tuple(lhs.rasterViews, lhs.computeViews, lhs.textures, lhs.subpassGraph, lhs.width, lhs.height, lhs.count, lhs.quality) ==
+           std::forward_as_tuple(rhs.rasterViews, rhs.computeViews, rhs.textures, rhs.subpassGraph, rhs.width, rhs.height, rhs.count, rhs.quality);
 }
 
 inline bool operator!=(const RasterPass& lhs, const RasterPass& rhs) noexcept {
@@ -387,6 +395,23 @@ struct PersistentTextureTag {};
 struct FramebufferTag {};
 struct SwapchainTag {};
 struct SamplerTag {};
+struct FormatViewTag {};
+struct SubresourceViewTag {};
+
+struct FormatView {
+    gfx::Format format{gfx::Format::UNKNOWN};
+};
+
+struct SubresourceView {
+    IntrusivePtr<gfx::Texture> textureView;
+    gfx::Format format{gfx::Format::UNKNOWN};
+    uint16_t indexOrFirstMipLevel{0};
+    uint16_t numMipLevels{0};
+    uint16_t firstArraySlice{0};
+    uint16_t numArraySlices{0};
+    uint16_t firstPlane{0};
+    uint16_t numPlanes{0};
+};
 
 struct ResourceGraph {
     using allocator_type = boost::container::pmr::polymorphic_allocator<char>;
@@ -472,10 +497,42 @@ struct ResourceGraph {
     using edge_iterator   = impl::DirectedEdgeIterator<vertex_iterator, out_edge_iterator, ResourceGraph>;
     using edges_size_type = uint32_t;
 
+    // AddressableGraph (Alias)
+    using ownership_descriptor = impl::EdgeDescriptor<boost::bidirectional_tag, vertex_descriptor>;
+
+    using ChildEdge = OutEdge;
+    using children_iterator  = impl::OutEdgeIter<
+        ccstd::pmr::vector<OutEdge>::iterator,
+        vertex_descriptor, ownership_descriptor, int32_t>;
+    using children_size_type = uint32_t;
+
+    using ParentEdge = InEdge;
+    using parent_iterator  = impl::InEdgeIter<
+        ccstd::pmr::vector<InEdge>::iterator,
+        vertex_descriptor, ownership_descriptor, int32_t>;
+
+    using ownership_iterator   = impl::DirectedEdgeIterator<vertex_iterator, children_iterator, ResourceGraph>;
+    using ownerships_size_type = edges_size_type;
+
+    // AddressableGraph help functions
+    inline ccstd::pmr::vector<OutEdge>& getChildrenList(vertex_descriptor v) noexcept {
+        return _vertices[v].outEdges;
+    }
+    inline const ccstd::pmr::vector<OutEdge>& getChildrenList(vertex_descriptor v) const noexcept {
+        return _vertices[v].outEdges;
+    }
+
+    inline ccstd::pmr::vector<InEdge>& getParentsList(vertex_descriptor v) noexcept {
+        return _vertices[v].inEdges;
+    }
+    inline const ccstd::pmr::vector<InEdge>& getParentsList(vertex_descriptor v) const noexcept {
+        return _vertices[v].inEdges;
+    }
+
     // PolymorphicGraph
-    using VertexTag         = ccstd::variant<ManagedTag, ManagedBufferTag, ManagedTextureTag, PersistentBufferTag, PersistentTextureTag, FramebufferTag, SwapchainTag>;
-    using VertexValue       = ccstd::variant<ManagedResource*, ManagedBuffer*, ManagedTexture*, IntrusivePtr<gfx::Buffer>*, IntrusivePtr<gfx::Texture>*, IntrusivePtr<gfx::Framebuffer>*, RenderSwapchain*>;
-    using VertexConstValue = ccstd::variant<const ManagedResource*, const ManagedBuffer*, const ManagedTexture*, const IntrusivePtr<gfx::Buffer>*, const IntrusivePtr<gfx::Texture>*, const IntrusivePtr<gfx::Framebuffer>*, const RenderSwapchain*>;
+    using VertexTag         = ccstd::variant<ManagedTag, ManagedBufferTag, ManagedTextureTag, PersistentBufferTag, PersistentTextureTag, FramebufferTag, SwapchainTag, FormatViewTag, SubresourceViewTag>;
+    using VertexValue       = ccstd::variant<ManagedResource*, ManagedBuffer*, ManagedTexture*, IntrusivePtr<gfx::Buffer>*, IntrusivePtr<gfx::Texture>*, IntrusivePtr<gfx::Framebuffer>*, RenderSwapchain*, FormatView*, SubresourceView*>;
+    using VertexConstValue = ccstd::variant<const ManagedResource*, const ManagedBuffer*, const ManagedTexture*, const IntrusivePtr<gfx::Buffer>*, const IntrusivePtr<gfx::Texture>*, const IntrusivePtr<gfx::Framebuffer>*, const RenderSwapchain*, const FormatView*, const SubresourceView*>;
     using VertexHandle      = ccstd::variant<
         impl::ValueHandle<ManagedTag, vertex_descriptor>,
         impl::ValueHandle<ManagedBufferTag, vertex_descriptor>,
@@ -483,11 +540,15 @@ struct ResourceGraph {
         impl::ValueHandle<PersistentBufferTag, vertex_descriptor>,
         impl::ValueHandle<PersistentTextureTag, vertex_descriptor>,
         impl::ValueHandle<FramebufferTag, vertex_descriptor>,
-        impl::ValueHandle<SwapchainTag, vertex_descriptor>>;
+        impl::ValueHandle<SwapchainTag, vertex_descriptor>,
+        impl::ValueHandle<FormatViewTag, vertex_descriptor>,
+        impl::ValueHandle<SubresourceViewTag, vertex_descriptor>>;
 
     void validateSwapchains();
     void mount(gfx::Device* device, vertex_descriptor vertID);
     void unmount(uint64_t completedFenceValue);
+    bool isTexture(vertex_descriptor resID) const noexcept;
+    bool isTextureView(vertex_descriptor resID) const noexcept;
     gfx::Texture* getTexture(vertex_descriptor resID);
     gfx::Buffer* getBuffer(vertex_descriptor resID);
     void invalidatePersistentRenderPassAndFramebuffer(gfx::Texture* pTexture);
@@ -538,6 +599,8 @@ struct ResourceGraph {
     ccstd::pmr::vector<IntrusivePtr<gfx::Texture>> textures;
     ccstd::pmr::vector<IntrusivePtr<gfx::Framebuffer>> framebuffers;
     ccstd::pmr::vector<RenderSwapchain> swapchains;
+    ccstd::pmr::vector<FormatView> formatViews;
+    ccstd::pmr::vector<SubresourceView> subresourceViews;
     // UuidGraph
     PmrUnorderedStringMap<ccstd::pmr::string, vertex_descriptor> valueIndex;
     // Members
@@ -562,6 +625,25 @@ struct ComputePass {
     ComputePass& operator=(ComputePass const& rhs) = default;
 
     PmrTransparentMap<ccstd::pmr::string, ccstd::pmr::vector<ComputeView>> computeViews;
+    PmrTransparentMap<ccstd::pmr::string, gfx::ShaderStageFlagBit> textures;
+};
+
+struct ResolvePass {
+    using allocator_type = boost::container::pmr::polymorphic_allocator<char>;
+    allocator_type get_allocator() const noexcept { // NOLINT
+        return {resolvePairs.get_allocator().resource()};
+    }
+
+    ResolvePass(const allocator_type& alloc) noexcept; // NOLINT
+    ResolvePass(ResolvePass&& rhs, const allocator_type& alloc);
+    ResolvePass(ResolvePass const& rhs, const allocator_type& alloc);
+
+    ResolvePass(ResolvePass&& rhs) noexcept = default;
+    ResolvePass(ResolvePass const& rhs) = delete;
+    ResolvePass& operator=(ResolvePass&& rhs) = default;
+    ResolvePass& operator=(ResolvePass const& rhs) = default;
+
+    ccstd::pmr::vector<ResolvePair> resolvePairs;
 };
 
 struct CopyPass {
@@ -572,14 +654,14 @@ struct CopyPass {
 
     CopyPass(const allocator_type& alloc) noexcept; // NOLINT
     CopyPass(CopyPass&& rhs, const allocator_type& alloc);
-    CopyPass(CopyPass const& rhs, const allocator_type& alloc);
 
     CopyPass(CopyPass&& rhs) noexcept = default;
     CopyPass(CopyPass const& rhs) = delete;
     CopyPass& operator=(CopyPass&& rhs) = default;
-    CopyPass& operator=(CopyPass const& rhs) = default;
+    CopyPass& operator=(CopyPass const& rhs) = delete;
 
     ccstd::pmr::vector<CopyPair> copyPairs;
+    ccstd::pmr::vector<UploadPair> uploadPairs;
 };
 
 struct MovePass {
@@ -660,26 +742,17 @@ struct RenderQueue {
 };
 
 struct SceneData {
-    using allocator_type = boost::container::pmr::polymorphic_allocator<char>;
-    allocator_type get_allocator() const noexcept { // NOLINT
-        return {name.get_allocator().resource()};
-    }
+    SceneData() = default;
+    SceneData(const scene::RenderScene* sceneIn, const scene::Camera* cameraIn, SceneFlags flagsIn, LightInfo lightIn) noexcept
+    : scene(sceneIn),
+      camera(cameraIn),
+      light(std::move(lightIn)),
+      flags(flagsIn) {}
 
-    SceneData(const allocator_type& alloc) noexcept; // NOLINT
-    SceneData(ccstd::pmr::string nameIn, SceneFlags flagsIn, LightInfo lightIn, const allocator_type& alloc) noexcept;
-    SceneData(SceneData&& rhs, const allocator_type& alloc);
-    SceneData(SceneData const& rhs, const allocator_type& alloc);
-
-    SceneData(SceneData&& rhs) noexcept = default;
-    SceneData(SceneData const& rhs) = delete;
-    SceneData& operator=(SceneData&& rhs) = default;
-    SceneData& operator=(SceneData const& rhs) = default;
-
-    ccstd::pmr::string name;
-    scene::Camera* camera{nullptr};
+    const scene::RenderScene* scene{nullptr};
+    const scene::Camera* camera{nullptr};
     LightInfo light;
     SceneFlags flags{SceneFlags::NONE};
-    ccstd::pmr::vector<const scene::RenderScene*> scenes;
 };
 
 struct Dispatch {
@@ -729,7 +802,7 @@ struct RenderData {
     PmrUnorderedMap<uint32_t, ccstd::pmr::vector<char>> constants;
     PmrUnorderedMap<uint32_t, IntrusivePtr<gfx::Buffer>> buffers;
     PmrUnorderedMap<uint32_t, IntrusivePtr<gfx::Texture>> textures;
-    PmrUnorderedMap<uint32_t, ObserverPtr<gfx::Sampler>> samplers;
+    PmrUnorderedMap<uint32_t, gfx::Sampler*> samplers;
     ccstd::pmr::string custom;
 };
 
@@ -852,14 +925,15 @@ struct RenderGraph {
     }
 
     // PolymorphicGraph
-    using VertexTag         = ccstd::variant<RasterPassTag, RasterSubpassTag, ComputeSubpassTag, ComputeTag, CopyTag, MoveTag, RaytraceTag, QueueTag, SceneTag, BlitTag, DispatchTag, ClearTag, ViewportTag>;
-    using VertexValue       = ccstd::variant<RasterPass*, RasterSubpass*, ComputeSubpass*, ComputePass*, CopyPass*, MovePass*, RaytracePass*, RenderQueue*, SceneData*, Blit*, Dispatch*, ccstd::pmr::vector<ClearView>*, gfx::Viewport*>;
-    using VertexConstValue = ccstd::variant<const RasterPass*, const RasterSubpass*, const ComputeSubpass*, const ComputePass*, const CopyPass*, const MovePass*, const RaytracePass*, const RenderQueue*, const SceneData*, const Blit*, const Dispatch*, const ccstd::pmr::vector<ClearView>*, const gfx::Viewport*>;
+    using VertexTag         = ccstd::variant<RasterPassTag, RasterSubpassTag, ComputeSubpassTag, ComputeTag, ResolveTag, CopyTag, MoveTag, RaytraceTag, QueueTag, SceneTag, BlitTag, DispatchTag, ClearTag, ViewportTag>;
+    using VertexValue       = ccstd::variant<RasterPass*, RasterSubpass*, ComputeSubpass*, ComputePass*, ResolvePass*, CopyPass*, MovePass*, RaytracePass*, RenderQueue*, SceneData*, Blit*, Dispatch*, ccstd::pmr::vector<ClearView>*, gfx::Viewport*>;
+    using VertexConstValue = ccstd::variant<const RasterPass*, const RasterSubpass*, const ComputeSubpass*, const ComputePass*, const ResolvePass*, const CopyPass*, const MovePass*, const RaytracePass*, const RenderQueue*, const SceneData*, const Blit*, const Dispatch*, const ccstd::pmr::vector<ClearView>*, const gfx::Viewport*>;
     using VertexHandle      = ccstd::variant<
         impl::ValueHandle<RasterPassTag, vertex_descriptor>,
         impl::ValueHandle<RasterSubpassTag, vertex_descriptor>,
         impl::ValueHandle<ComputeSubpassTag, vertex_descriptor>,
         impl::ValueHandle<ComputeTag, vertex_descriptor>,
+        impl::ValueHandle<ResolveTag, vertex_descriptor>,
         impl::ValueHandle<CopyTag, vertex_descriptor>,
         impl::ValueHandle<MoveTag, vertex_descriptor>,
         impl::ValueHandle<RaytraceTag, vertex_descriptor>,
@@ -934,6 +1008,7 @@ struct RenderGraph {
     ccstd::pmr::vector<RasterSubpass> rasterSubpasses;
     ccstd::pmr::vector<ComputeSubpass> computeSubpasses;
     ccstd::pmr::vector<ComputePass> computePasses;
+    ccstd::pmr::vector<ResolvePass> resolvePasses;
     ccstd::pmr::vector<CopyPass> copyPasses;
     ccstd::pmr::vector<MovePass> movePasses;
     ccstd::pmr::vector<RaytracePass> raytracePasses;
@@ -971,9 +1046,12 @@ inline hash_t hash<cc::render::RasterPass>::operator()(const cc::render::RasterP
     hash_t seed = 0;
     hash_combine(seed, val.rasterViews);
     hash_combine(seed, val.computeViews);
+    hash_combine(seed, val.textures);
     hash_combine(seed, val.subpassGraph);
     hash_combine(seed, val.width);
     hash_combine(seed, val.height);
+    hash_combine(seed, val.count);
+    hash_combine(seed, val.quality);
     return seed;
 }
 

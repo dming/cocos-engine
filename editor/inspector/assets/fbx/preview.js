@@ -74,7 +74,6 @@ exports.style = /* css*/`
 }
 .preview-container {
     min-height: 200px;
-    margin-top: 10px;
     border-top: 1px solid var(--color-normal-border);
 }
 .preview[hoving] > .preview-container {
@@ -86,7 +85,6 @@ exports.style = /* css*/`
     outline-offset: -2px;
 }
 .preview-container > .model-info {
-    padding-top: 5px;
     display: none;
 }
 .preview-container > .model-info > ui-label {
@@ -97,14 +95,13 @@ exports.style = /* css*/`
     overflow: hidden;
     display: flex;
     flex: 1;
-    margin: 2px;
 }
 .preview-container >.image > .canvas {
     flex: 1;
 }
 .preview-container .toolbar {
     display: flex;
-    margin-top: 10px;
+    margin-top: 4px;
     justify-content: space-between;
 }
 
@@ -113,8 +110,7 @@ exports.style = /* css*/`
     flex: 1;
 }
 .preview-container .toolbar > * {
-    line-height: 25px;
-    margin-right: 5px;
+    margin-left: 4px;
 }
 
 ui-icon {
@@ -123,6 +119,7 @@ ui-icon {
 
 .time-line {
     position: relative;
+    padding: 4px;
 }
 
 .time-line .events {
@@ -165,7 +162,7 @@ ui-icon {
     background: var(--color-normal-fill);
 }
 #event-editor {
-    line-height: 24px;
+    line-height: 20px;
     width: 100%;
     height: 70%;
     overflow: hidden;
@@ -179,19 +176,19 @@ ui-icon {
   #event-editor > header {
     display: flex;
     justify-content: space-between;
-    height: 24px;
+    height: 20px;
     background: var(--color-normal-fill-emphasis);
-    padding: 5px;
+    padding: 2px 4px;
   }
   #event-editor > .header .name {
-    margin: 0 5px;
+    margin: 0 4px;
   }
   #event-editor > .header .dirty {
     color: var(--color-focus-fill);
     margin: 0 2px;
   }
   #event-editor > .functions {
-    padding: 10px;
+    padding: 4px;
     overflow-y: auto;
     flex: 1;
     height: 100%;
@@ -203,7 +200,6 @@ ui-icon {
   #event-editor > .functions .line {
     display: flex;
     justify-content: space-between;
-    padding: 0 8px;
     flex: 1;
     background: unset;
   }
@@ -212,9 +208,6 @@ ui-icon {
   }
   #event-editor > .functions .line .name {
     min-width: 8px;
-  }
-  #event-editor > .functions .line > * {
-    margin-right: 5px;
   }
   #event-editor > .functions .line .operate {
     visibility: hidden;
@@ -225,19 +218,14 @@ ui-icon {
   #event-editor > .functions .header ui-input {
     background-color: transparent;
     border-color: transparent;
-    line-height: 18px;
   }
   #event-editor > .functions .header ui-input:hover {
     background-color: var(--color-normal-fill-emphasis);
-  }
-  #event-editor > .functions > * {
-    margin-top: 10px;
   }
   #event-editor ui-input,
   #event-editor ui-checkbox,
   #event-editor ui-num-input {
     width: 100%;
-    height: 25px;
   }
   #event-editor ui-section {
     width: 100%;
@@ -248,11 +236,10 @@ ui-icon {
   }
   #event-editor .tools {
     display: flex;
-    border-bottom: 1px solid;
-    padding: 10px 0;
+    padding: 4px 0;
   }
   #event-editor .tools ui-icon {
-    margin: 0 5px;
+    margin: 0 4px;
   }
   #event-editor .params {
     border: 1px rgba(136, 136, 136, 0.35) dashed;
@@ -679,16 +666,16 @@ exports.methods = {
 
     addAssetChangeListener(add = true) {
         if (!add && this.hasListenAssetsChange) {
-            Editor.Message.removeBroadcastListener('asset-db:asset-change', this.onAssetChangeBind);
+            Editor.Message.__protected__.removeBroadcastListener('scene:asset-applied', this.onAssetChangeBind);
             this.hasListenAssetsChange = false;
             return;
         }
-        Editor.Message.addBroadcastListener('asset-db:asset-change', this.onAssetChangeBind);
+        Editor.Message.__protected__.addBroadcastListener('scene:asset-applied', this.onAssetChangeBind);
         this.hasListenAssetsChange = true;
     },
 
-    async onAssetChange(uuid) {
-        if (this.asset.uuid === uuid) {
+    async onAssetChange(uuids) {
+        if (uuids.includes(this.asset.uuid)) {
             // Update the animation dump when the parent assets changes
             this.meta = await Editor.Message.request('asset-db', 'query-asset-meta', this.asset.uuid);
             const clipInfo = animation.methods.getCurClipInfo.call(this);
@@ -697,7 +684,7 @@ exports.methods = {
     },
 };
 
-exports.ready = function () {
+exports.ready = function() {
     this.gridWidth = 0;
     this.gridTableWith = 0;
     this.activeTab = 'animation';
@@ -739,7 +726,7 @@ exports.ready = function () {
     this.eventEditor.ready.call(this);
 };
 
-exports.update = async function (assetList, metaList) {
+exports.update = async function(assetList, metaList) {
     this.assetList = assetList;
     this.metaList = metaList;
     this.isMultiple = this.assetList.length > 1;
@@ -770,7 +757,7 @@ exports.update = async function (assetList, metaList) {
     this.refreshPreview();
 };
 
-exports.close = function () {
+exports.close = function() {
     for (const prop in Elements) {
         const element = Elements[prop];
         if (element.close) {

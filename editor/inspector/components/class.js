@@ -1,23 +1,19 @@
 'use strict';
+const { getName } = require('../utils/prop');
+
 exports.template = `
-<section></section>
+<div class="container"></div>
 `;
 exports.$ = {
-    section: 'section',
+    container: '.container',
 };
 exports.style = `
     .tab-group {
-        margin-top: 10px;
-        margin-bottom: 10px;
+        margin-top: 4px;
     }
     .tab-content {
         display: none;
-        border: 1px dashed var(--color-normal-border);
-        padding: 10px;
-        margin-top: -9px;
-        border-top-right-radius: calc(var(--size-normal-radius) * 1px);
-        border-bottom-left-radius: calc(var(--size-normal-radius) * 1px);
-        border-bottom-right-radius: calc(var(--size-normal-radius) * 1px);
+        padding-bottom: 6px;
     }
 `;
 exports.methods = {
@@ -30,7 +26,9 @@ exports.methods = {
 
         $group.$header = document.createElement('ui-tab');
         $group.$header.setAttribute('class', 'tab-header');
+        $group.$header.setAttribute('underline', '');
         $group.appendChild($group.$header);
+
         $group.$header.addEventListener('change', (e) => {
             active(e.target.value);
         });
@@ -75,7 +73,7 @@ exports.methods = {
         $group.appendChild($content);
 
         const $label = document.createElement('ui-label');
-        $label.value = this.getName(tabName);
+        $label.value = getName({ name: tabName });
 
         const $button = document.createElement('ui-button');
         $button.setAttribute('name', tabName);
@@ -92,15 +90,6 @@ exports.methods = {
             parent.appendChild(newChild);
         }
     },
-    getName(name) {
-        name = name.trim().replace(/^\S/, (str) => str.toUpperCase());
-        name = name.replace(/_/g, ' ');
-        name = name.replace(/ \S/g, (str) => ` ${str.toUpperCase()}`);
-        // 驼峰转中间空格
-        name = name.replace(/([a-z])([A-Z])/g, '$1 $2');
-
-        return name.trim();
-    },
 };
 /**
  * 自动渲染组件的方法
@@ -113,7 +102,7 @@ async function update(dump) {
         return;
     }
 
-    const $section = $panel.$.section;
+    const $container = $panel.$.container;
     const oldPropList = Object.keys($panel.$propList);
     const newPropList = [];
 
@@ -148,7 +137,7 @@ async function update(dump) {
                 }
                 if ($panel.$groups[id]) {
                     if (!$panel.$groups[id].isConnected) {
-                        $panel.appendChildByDisplayOrder($section, $panel.$groups[id]);
+                        $panel.appendChildByDisplayOrder($container, $panel.$groups[id]);
                     }
                     if (dump.groups[id].style === 'tab') {
                         $panel.appendToTabGroup($panel.$groups[id], name);
@@ -156,14 +145,14 @@ async function update(dump) {
                 }
                 $panel.appendChildByDisplayOrder($panel.$groups[id].tabs[name], $prop);
             } else {
-                $panel.appendChildByDisplayOrder($section, $prop);
+                $panel.appendChildByDisplayOrder($container, $prop);
             }
         } else if (!$prop.isConnected || !$prop.parentElement) {
             if (info.group && dump.groups) {
                 const { id = 'default', name } = info.group;
                 $panel.appendChildByDisplayOrder($panel.$groups[id].tabs[name], $prop);
             } else {
-                $panel.appendChildByDisplayOrder($section, $prop);
+                $panel.appendChildByDisplayOrder($container, $prop);
             }
         }
         $prop.render(info);

@@ -26,7 +26,7 @@
 
 import { ccclass } from 'cc.decorator';
 
-import { EDITOR } from 'internal:constants';
+import { EDITOR_NOT_IN_PREVIEW } from 'internal:constants';
 import { UIRenderer } from '../2d/framework/ui-renderer';
 import { SpriteFrame } from '../2d/assets/sprite-frame';
 import { Component, Node } from '../scene-graph';
@@ -41,11 +41,11 @@ import {
 } from './tiled-types';
 import { fillTextureGrids } from './tiled-utils';
 import { NodeEventType } from '../scene-graph/node-event';
-import { legacyCC } from '../core/global-exports';
 import { RenderEntity, RenderEntityType } from '../2d/renderer/render-entity';
 import { RenderDrawInfo, RenderDrawInfoType } from '../2d/renderer/render-draw-info';
 import { Texture2D } from '../asset/assets';
 import { director } from '../game';
+import { Camera } from '../render-scene/scene';
 
 const _mat4_temp = new Mat4();
 const _vec2_temp = new Vec2();
@@ -170,6 +170,8 @@ export class TiledLayer extends UIRenderer {
     protected _offset?: Vec2;
 
     protected _tiledDataArray: TiledDataArray = [];
+
+    protected _cameraNode?: Node;
 
     get tiledDataArray () { return this._tiledDataArray; }
     get leftDownToCenterX () { return this._leftDownToCenterX; }
@@ -400,6 +402,28 @@ export class TiledLayer extends UIRenderer {
         this._userNodeDirty = value;
     }
 
+    protected _reinstallCamera (): Camera | null {
+        const camera = director.root!.batcher2D.getFirstRenderCamera(this.node);
+        const cameraNode = camera?.node;
+        if (this._cameraNode !== cameraNode) {
+            this._uninstallCamera();
+            if (cameraNode) {
+                cameraNode.on(NodeEventType.TRANSFORM_CHANGED, this.updateCulling, this);
+                cameraNode.on(NodeEventType.SIZE_CHANGED, this.updateCulling, this);
+                this._cameraNode = cameraNode;
+            }
+        }
+        return camera;
+    }
+
+    protected _uninstallCamera () {
+        if (this._cameraNode) {
+            this._cameraNode.off(NodeEventType.TRANSFORM_CHANGED, this.updateCulling, this);
+            this._cameraNode.off(NodeEventType.SIZE_CHANGED, this.updateCulling, this);
+            delete this._cameraNode;
+        }
+    }
+
     onEnable () {
         super.onEnable();
         this.node.on(NodeEventType.ANCHOR_CHANGED, this._syncAnchorPoint, this);
@@ -419,6 +443,7 @@ export class TiledLayer extends UIRenderer {
         this.node.off(NodeEventType.SIZE_CHANGED, this.updateCulling, this);
         this.node.off(NodeEventType.TRANSFORM_CHANGED, this.updateCulling, this);
         this.node.off(NodeEventType.ANCHOR_CHANGED, this._syncAnchorPoint, this);
+        this._uninstallCamera();
     }
 
     protected _syncAnchorPoint () {
@@ -849,12 +874,12 @@ export class TiledLayer extends UIRenderer {
     }
 
     public updateCulling () {
-        if (EDITOR && !legacyCC.GAME_VIEW) {
+        if (EDITOR_NOT_IN_PREVIEW) {
             this.enableCulling = false;
         } else if (this._enableCulling) {
             this.node.updateWorldTransform();
             Mat4.invert(_mat4_temp, this.node.getWorldMatrix());
-            const camera = director.root!.batcher2D.getFirstRenderCamera(this.node);
+            const camera = this._reinstallCamera(); // developer should call updateCalling if the camera has changed
             if (camera) {
                 _vec3_temp.x = 0;
                 _vec3_temp.y = 0;

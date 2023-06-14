@@ -113,6 +113,7 @@ bool GLES3Device::doInit(const DeviceInfo & /*info*/) {
     _features[toNumber(Feature::MULTIPLE_RENDER_TARGETS)] = true;
     _features[toNumber(Feature::BLEND_MINMAX)] = true;
     _features[toNumber(Feature::ELEMENT_INDEX_UINT)] = true;
+    _features[toNumber(Feature::RASTERIZATION_ORDER_NOCOHERENT)] = false;
 
     if (_gpuConstantRegistry->glMinorVersion) {
         _features[toNumber(Feature::COMPUTE_SHADER)] = true;
@@ -120,8 +121,7 @@ bool GLES3Device::doInit(const DeviceInfo & /*info*/) {
 
     ccstd::string fbfLevelStr = "NONE";
     // PVRVFrame has issues on their support
-#if 0 // CC_PLATFORM != CC_PLATFORM_WINDOWS
-    // TODO: enable fbf in the future, it is not implemented yet in gles3 backend
+//#if CC_PLATFORM != CC_PLATFORM_WINDOWS
     if (checkExtension("framebuffer_fetch")) {
         ccstd::string nonCoherent = "framebuffer_fetch_non";
 
@@ -132,10 +132,12 @@ bool GLES3Device::doInit(const DeviceInfo & /*info*/) {
         if (it != _extensions.end()) {
             if (*it == CC_TOSTR(GL_EXT_shader_framebuffer_fetch_non_coherent)) {
                 _gpuConstantRegistry->mFBF = FBFSupportLevel::NON_COHERENT_EXT;
+                _features[toNumber(Feature::RASTERIZATION_ORDER_NOCOHERENT)] = true;
                 fbfLevelStr                = "NON_COHERENT_EXT";
             } else if (*it == CC_TOSTR(GL_QCOM_shader_framebuffer_fetch_noncoherent)) {
                 _gpuConstantRegistry->mFBF = FBFSupportLevel::NON_COHERENT_QCOM;
                 fbfLevelStr                = "NON_COHERENT_QCOM";
+                _features[toNumber(Feature::RASTERIZATION_ORDER_NOCOHERENT)] = true;
                 GL_CHECK(glEnable(GL_FRAMEBUFFER_FETCH_NONCOHERENT_QCOM));
             }
         } else if (checkExtension(CC_TOSTR(GL_EXT_shader_framebuffer_fetch))) {
@@ -144,8 +146,15 @@ bool GLES3Device::doInit(const DeviceInfo & /*info*/) {
             fbfLevelStr                = "COHERENT";
         }
         _features[toNumber(Feature::INPUT_ATTACHMENT_BENEFIT)] = _gpuConstantRegistry->mFBF != FBFSupportLevel::NONE;
+        _features[toNumber(Feature::SUBPASS_COLOR_INPUT)] = true;
     }
-#endif
+
+    if (checkExtension(CC_TOSTR(ARM_shader_framebuffer_fetch_depth_stencil))) {
+        _features[toNumber(Feature::SUBPASS_DEPTH_STENCIL_INPUT)] = true;
+        fbfLevelStr                += "_DEPTH_STENCIL";
+    }
+//#endif
+    _gpuConstantRegistry->multiDrawIndirect = checkExtension((CC_TOSTR(multi_draw_indirect)));
 
 #if CC_PLATFORM != CC_PLATFORM_WINDOWS || ALLOW_MULTISAMPLED_RENDER_TO_TEXTURE_ON_DESKTOP
     if (checkExtension("multisampled_render_to_texture")) {

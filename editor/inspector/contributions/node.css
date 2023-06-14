@@ -8,8 +8,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow-y: scroll;
-    overflow-x: auto;
+    overflow: auto;
 }
 
 .container[hoving] {
@@ -19,7 +18,7 @@
 
 .prefab {
     display: flex;
-    padding: 5px 0 10px 0;
+    padding: 4px 4px 0 4px;
 }
 
 .prefab[hidden] {
@@ -32,8 +31,8 @@
 }
 
 .prefab > ui-button {
-    padding: 0 7px;
-    margin-left: 10px;
+    padding: 0 8px;
+    margin-left: 4px;
 }
 
 .prefab[missing] > ui-label {
@@ -44,20 +43,33 @@
     display: none;
     margin-top: 4px;
     margin-bottom: 4px;
-    padding-left: 2px;
+}
+
+.header > .active {
+    width: 20px;
 }
 
 .header > .name,
 .component-header .name {
     flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .scene {
     display: none;
+    border-top: solid 1px var(--color-normal-border);
+}
+
+.scene ui-prop[ui-section-config] ui-section.config [slot="header"] {
+    flex: 1;
+    justify-content: space-between;
 }
 
 .scene .envmap .envmap-prop ui-prop {
     margin-top: 0;
+    margin-left: 0;
 }
 
 :host([type="node"][sub-type='scene']) > .container > .scene {
@@ -121,7 +133,7 @@
 
 .node .layer-content > .layer-select {
     flex: 1;
-    margin-top: 0;
+    margin: 0;
 }
 
 .node .layer-content > .layer-edit {
@@ -138,6 +150,7 @@
 
 .component .component-header {
     flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
 }
@@ -172,6 +185,10 @@
     margin-top: 4px;
 }
 
+.scene .skybox > [slot="header"] {
+    justify-content: space-between;
+}
+
 .component ui-prop [slot='label'] {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -183,15 +200,19 @@
     text-align: center;
 }
 
+.footer .add-component {
+    padding: 0 24px;
+}
+
+.section-asset {
+    margin-bottom: 16px;
+}
+
 .section-asset:empty {
     display: none;
 }
 
 .section-asset > ui-panel[type="asset"] {
-    margin-bottom: 4px;
-    border-radius: 2px;
-}
-
-.section-asset > ui-panel[type="asset"][focused] {
-    box-shadow: var(--color-primary-contrast-weakest) 0 0 4px;
+    --asset-container-margin-top: 0;
+    --asset-container-content-section-overflow: visible;
 }

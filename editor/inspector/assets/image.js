@@ -2,6 +2,7 @@
 
 const { join } = require('path');
 const { updateElementReadonly, updateElementInvalid } = require('../utils/assets');
+const { injectionStyle } = require('../utils/prop');
 
 exports.template = /* html */`
 <div class="asset-image">
@@ -37,15 +38,7 @@ exports.template = /* html */`
 `;
 
 exports.style = /* css */`
-    .asset-image > ui-prop {
-        margin: 4px 0;
-    }
-    .asset-image > ui-section {
-        margin: 4px 0;
-    }
-    .asset-image > ui-section > ui-panel {
-        margin-top: 5px;
-    }
+
 `;
 
 exports.$ = {
@@ -285,7 +278,8 @@ exports.methods = {
         $label.setAttribute('value', type);
         const $panel = $section.querySelector('ui-panel');
         $panel.setAttribute('src', join(__dirname, `./${asset.importer}.js`));
-        $panel.update(assetList, metaList);
+        $panel.injectionStyle(injectionStyle);
+        $panel.update(assetList, metaList, this.assetList);
     },
 
     checkSpriteFrameChange(srcType, destType) {
@@ -323,9 +317,9 @@ exports.methods = {
                 const subMeta = meta.subMetas[subUuid];
                 if (!subMeta || subMeta.importer === '*') {
                     continue;
-                } 
+                }
                 if (subMeta.importer === imageImporter) {
-                    if (spriteFrameChange === 'othersToSpriteFrame' && subMeta.userData.mipfilter !== 'none') {
+                    if (spriteFrameChange === 'othersToSpriteFrame' && imageImporter === 'texture' && subMeta.userData.mipfilter !== 'none') {
                         // imageAsset type change to spriteFrame，disabled mipmaps
                         subMeta.userData.mipfilter = 'none';
                         mipChanged = true;
@@ -344,7 +338,7 @@ exports.methods = {
                 Editor.Message.request('asset-db', 'save-asset-meta', meta.uuid, content);
             }
         });
-    }
+    },
 };
 
 exports.ready = function() {
@@ -376,7 +370,7 @@ exports.update = function(assetList, metaList) {
     this.asset = assetList[0];
     this.meta = metaList[0];
 
-    if (this.originMetaList) {
+    if (this.originMetaList && !this.asset.readonly) {
         // if the image type changes between sprite-frame
         const spriteFrameChange = this.checkSpriteFrameChange(this.originMetaList[0].userData.type, this.meta.userData.type);
         this.handleTypeChange(spriteFrameChange, this.meta.userData.type);

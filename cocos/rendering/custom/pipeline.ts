@@ -31,13 +31,12 @@
 import { Material } from '../../asset/assets';
 import { Camera } from '../../render-scene/scene/camera';
 import { GeometryRenderer } from '../geometry-renderer';
-import { Buffer, BufferInfo, ClearFlagBit, Color, CommandBuffer, DescriptorSet, DescriptorSetLayout, Device, DrawInfo, Format, InputAssembler, LoadOp, PipelineState, Rect, Sampler, ShaderStageFlagBit, StoreOp, Swapchain, Texture, TextureInfo, Viewport } from '../../gfx';
+import { Buffer, BufferInfo, ClearFlagBit, Color, CommandBuffer, DescriptorSet, DescriptorSetLayout, Device, DrawInfo, Format, InputAssembler, LoadOp, PipelineState, Rect, ResolveMode, Sampler, ShaderStageFlagBit, StoreOp, Swapchain, Texture, TextureInfo, Viewport } from '../../gfx';
 import { GlobalDSManager } from '../global-descriptor-set-manager';
 import { Mat4, Quat, Vec2, Vec4 } from '../../core/math';
 import { MacroRecord } from '../../render-scene/core/pass-utils';
 import { PipelineSceneData } from '../pipeline-scene-data';
-import { AccessType, ClearValue, ClearValueType, ComputeView, CopyPair, LightInfo, MovePair, QueueHint, RasterView, ResourceResidency, SceneFlags, TaskType, UpdateFrequency } from './types';
-import { RenderScene } from '../../render-scene/core/render-scene';
+import { AccessType, ComputeView, CopyPair, LightInfo, MovePair, QueueHint, RasterView, ResolvePair, ResourceResidency, SceneFlags, TaskType, UpdateFrequency, UploadPair } from './types';
 import { RenderWindow } from '../../render-scene/core/render-window';
 import { Model } from '../../render-scene/scene';
 
@@ -63,152 +62,6 @@ export interface PipelineRuntime {
     setMacroInt (name: string, value: number): void;
     setMacroBool (name: string, value: boolean): void;
     onGlobalPipelineStateChanged (): void;
-}
-
-export interface RenderNode {
-    name: string;
-    /**
-     * @beta function signature might change
-     */
-    setCustomBehavior (name: string): void;
-}
-
-export interface Setter extends RenderNode {
-    setMat4 (name: string, mat: Mat4): void;
-    setQuaternion (name: string, quat: Quat): void;
-    setColor (name: string, color: Color): void;
-    setVec4 (name: string, vec: Vec4): void;
-    setVec2 (name: string, vec: Vec2): void;
-    setFloat (name: string, v: number): void;
-    setArrayBuffer (name: string, arrayBuffer: ArrayBuffer): void;
-    setBuffer (name: string, buffer: Buffer): void;
-    setTexture (name: string, texture: Texture): void;
-    setReadWriteBuffer (name: string, buffer: Buffer): void;
-    setReadWriteTexture (name: string, texture: Texture): void;
-    setSampler (name: string, sampler: Sampler): void;
-    setCamera (camera: Camera): void;
-}
-
-export interface RenderQueueBuilder extends Setter {
-    /**
-     * @deprecated method will be removed in 3.8.0
-     */
-    addSceneOfCamera (camera: Camera, light: LightInfo, sceneFlags?: SceneFlags): void;
-    addScene (scene: RenderScene, sceneFlags?: SceneFlags): void;
-    addFullscreenQuad (material: Material, passID: number, sceneFlags?: SceneFlags): void;
-    addCameraQuad (camera: Camera, material: Material, passID: number, sceneFlags?: SceneFlags): void;
-    clearRenderTarget (name: string, color?: Color): void;
-    setViewport (viewport: Viewport): void;
-    /**
-     * @beta function signature might change
-     */
-    addCustomCommand (customBehavior: string): void;
-}
-
-export interface RenderSubpassBuilder extends Setter {
-    addRenderTarget (name: string, accessType: AccessType, slotName?: string, loadOp?: LoadOp, storeOp?: StoreOp, color?: Color): void;
-    addDepthStencil (name: string, accessType: AccessType, depthSlotName?: string, stencilSlotName?: string, loadOp?: LoadOp, storeOp?: StoreOp, depth?: number, stencil?: number, clearFlags?: ClearFlagBit): void;
-    addTexture (name: string, slotName: string, sampler?: Sampler | null, plane?: number): void;
-    addStorageBuffer (name: string, accessType: AccessType, slotName: string, clearType?: ClearValueType, clearValue?: ClearValue): void;
-    addStorageImage (name: string, accessType: AccessType, slotName: string, clearType?: ClearValueType, clearValue?: ClearValue): void;
-    /**
-     * @deprecated method will be removed in 3.8.0
-     */
-    addComputeView (name: string, view: ComputeView): void;
-    setViewport (viewport: Viewport): void;
-    addQueue (hint?: QueueHint, layoutName?: string): RenderQueueBuilder;
-    showStatistics: boolean;
-    /**
-     * @beta function signature might change
-     */
-    setCustomShaderStages (name: string, stageFlags: ShaderStageFlagBit): void;
-}
-
-export interface ComputeQueueBuilder extends Setter {
-    addDispatch (threadGroupCountX: number, threadGroupCountY: number, threadGroupCountZ: number, material?: Material, passID?: number): void;
-}
-
-export interface ComputeSubpassBuilder extends Setter {
-    addRenderTarget (name: string, slotName: string): void;
-    addTexture (name: string, slotName: string, sampler?: Sampler | null, plane?: number): void;
-    addStorageBuffer (name: string, accessType: AccessType, slotName: string, clearType?: ClearValueType, clearValue?: ClearValue): void;
-    addStorageImage (name: string, accessType: AccessType, slotName: string, clearType?: ClearValueType, clearValue?: ClearValue): void;
-    /**
-     * @deprecated method will be removed in 3.8.0
-     */
-    addComputeView (name: string, view: ComputeView): void;
-    addQueue (layoutName?: string): ComputeQueueBuilder;
-    /**
-     * @beta function signature might change
-     */
-    setCustomShaderStages (name: string, stageFlags: ShaderStageFlagBit): void;
-}
-
-export interface BasicRenderPassBuilder extends Setter {
-    addRenderTarget (name: string, loadOp?: LoadOp, storeOp?: StoreOp, color?: Color): void;
-    addDepthStencil (name: string, loadOp?: LoadOp, storeOp?: StoreOp, depth?: number, stencil?: number, clearFlags?: ClearFlagBit): void;
-    addTexture (name: string, slotName: string, sampler?: Sampler | null, plane?: number): void;
-    /**
-     * @deprecated method will be removed in 3.8.0
-     */
-    addRasterView (name: string, view: RasterView): void;
-    /**
-     * @deprecated method will be removed in 3.8.0
-     */
-    addComputeView (name: string, view: ComputeView): void;
-    addQueue (hint?: QueueHint, layoutName?: string): RenderQueueBuilder;
-    setViewport (viewport: Viewport): void;
-    setVersion (name: string, version: number): void;
-    showStatistics: boolean;
-}
-
-export interface RenderPassBuilder extends BasicRenderPassBuilder {
-    addStorageBuffer (name: string, accessType: AccessType, slotName: string, clearType?: ClearValueType, clearValue?: ClearValue): void;
-    addStorageImage (name: string, accessType: AccessType, slotName: string, clearType?: ClearValueType, clearValue?: ClearValue): void;
-    addRenderSubpass (layoutName?: string): RenderSubpassBuilder;
-    addComputeSubpass (layoutName?: string): ComputeSubpassBuilder;
-    /**
-     * @beta function signature might change
-     */
-    setCustomShaderStages (name: string, stageFlags: ShaderStageFlagBit): void;
-}
-
-export interface ComputePassBuilder extends Setter {
-    addTexture (name: string, slotName: string, sampler?: Sampler | null, plane?: number): void;
-    addStorageBuffer (name: string, accessType: AccessType, slotName: string, clearType?: ClearValueType, clearValue?: ClearValue): void;
-    addStorageImage (name: string, accessType: AccessType, slotName: string, clearType?: ClearValueType, clearValue?: ClearValue): void;
-    /**
-     * @deprecated method will be removed in 3.8.0
-     */
-    addComputeView (name: string, view: ComputeView): void;
-    addQueue (layoutName?: string): ComputeQueueBuilder;
-    /**
-     * @beta function signature might change
-     */
-    setCustomShaderStages (name: string, stageFlags: ShaderStageFlagBit): void;
-}
-
-export interface SceneVisitor {
-    readonly pipelineSceneData: PipelineSceneData;
-    setViewport (vp: Viewport): void;
-    setScissor (rect: Rect): void;
-    bindPipelineState (pso: PipelineState): void;
-    bindInputAssembler (ia: InputAssembler): void;
-    draw (info: DrawInfo): void;
-
-    bindDescriptorSet (set: number, descriptorSet: DescriptorSet, dynamicOffsets?: number[]): void;
-    updateBuffer (buffer: Buffer, data: ArrayBuffer, size?: number): void;
-}
-
-export interface SceneTask {
-    readonly taskType: TaskType;
-    start (): void;
-    join (): void;
-    submit (): void;
-}
-
-export interface SceneTransversal {
-    transverse (visitor: SceneVisitor): SceneTask;
 }
 
 export enum PipelineType {
@@ -238,6 +91,86 @@ export class PipelineCapabilities {
     subpass: SubpassCapabilities = SubpassCapabilities.NONE;
 }
 
+export interface RenderNode {
+    name: string;
+    /**
+     * @beta function signature might change
+     */
+    setCustomBehavior (name: string): void;
+}
+
+export interface Setter extends RenderNode {
+    setMat4 (name: string, mat: Mat4): void;
+    setQuaternion (name: string, quat: Quat): void;
+    setColor (name: string, color: Color): void;
+    setVec4 (name: string, vec: Vec4): void;
+    setVec2 (name: string, vec: Vec2): void;
+    setFloat (name: string, v: number): void;
+    setArrayBuffer (name: string, arrayBuffer: ArrayBuffer): void;
+    setBuffer (name: string, buffer: Buffer): void;
+    setTexture (name: string, texture: Texture): void;
+    setReadWriteBuffer (name: string, buffer: Buffer): void;
+    setReadWriteTexture (name: string, texture: Texture): void;
+    setSampler (name: string, sampler: Sampler): void;
+}
+
+export interface RenderQueueBuilder extends Setter {
+    /**
+     * @deprecated method will be removed in 3.9.0
+     */
+    addSceneOfCamera (
+        camera: Camera,
+        light: LightInfo,
+        sceneFlags?: SceneFlags): void;
+    addFullscreenQuad (
+        material: Material,
+        passID: number,
+        sceneFlags?: SceneFlags): void;
+    addCameraQuad (
+        camera: Camera,
+        material: Material,
+        passID: number,
+        sceneFlags?: SceneFlags): void;
+    clearRenderTarget (name: string, color?: Color): void;
+    setViewport (viewport: Viewport): void;
+    /**
+     * @beta function signature might change
+     */
+    addCustomCommand (customBehavior: string): void;
+}
+
+export interface BasicRenderPassBuilder extends Setter {
+    addRenderTarget (
+        name: string,
+        loadOp?: LoadOp,
+        storeOp?: StoreOp,
+        color?: Color): void;
+    addDepthStencil (
+        name: string,
+        loadOp?: LoadOp,
+        storeOp?: StoreOp,
+        depth?: number,
+        stencil?: number,
+        clearFlags?: ClearFlagBit): void;
+    addTexture (
+        name: string,
+        slotName: string,
+        sampler?: Sampler | null,
+        plane?: number): void;
+    /**
+     * @deprecated method will be removed in 3.9.0
+     */
+    addRasterView (name: string, view: RasterView): void;
+    /**
+     * @deprecated method will be removed in 3.9.0
+     */
+    addComputeView (name: string, view: ComputeView): void;
+    addQueue (hint?: QueueHint, phaseName?: string): RenderQueueBuilder;
+    setViewport (viewport: Viewport): void;
+    setVersion (name: string, version: number): void;
+    showStatistics: boolean;
+}
+
 export interface BasicPipeline extends PipelineRuntime {
     readonly type: PipelineType;
     readonly capabilities: PipelineCapabilities;
@@ -245,40 +178,274 @@ export interface BasicPipeline extends PipelineRuntime {
     endSetup (): void;
     containsResource (name: string): boolean;
     /**
-     * @deprecated method will be removed in 3.8.0
+     * @deprecated method will be removed in 3.9.0
      */
-    addRenderTexture (name: string, format: Format, width: number, height: number, renderWindow: RenderWindow): number;
-    addRenderWindow (name: string, format: Format, width: number, height: number, renderWindow: RenderWindow): number;
+    addRenderTexture (
+        name: string,
+        format: Format,
+        width: number,
+        height: number,
+        renderWindow: RenderWindow): number;
+    addRenderWindow (
+        name: string,
+        format: Format,
+        width: number,
+        height: number,
+        renderWindow: RenderWindow): number;
     updateRenderWindow (name: string, renderWindow: RenderWindow): void;
-    addRenderTarget (name: string, format: Format, width: number, height: number, residency?: ResourceResidency): number;
-    addDepthStencil (name: string, format: Format, width: number, height: number, residency?: ResourceResidency): number;
-    updateRenderTarget (name: string, width: number, height: number, format?: Format): void;
-    updateDepthStencil (name: string, width: number, height: number, format?: Format): void;
+    addRenderTarget (
+        name: string,
+        format: Format,
+        width: number,
+        height: number,
+        residency?: ResourceResidency): number;
+    addDepthStencil (
+        name: string,
+        format: Format,
+        width: number,
+        height: number,
+        residency?: ResourceResidency): number;
+    updateRenderTarget (
+        name: string,
+        width: number,
+        height: number,
+        format?: Format): void;
+    updateDepthStencil (
+        name: string,
+        width: number,
+        height: number,
+        format?: Format): void;
     beginFrame (): void;
+    update (camera: Camera): void;
     endFrame (): void;
-    addRenderPass (width: number, height: number, layoutName?: string): BasicRenderPassBuilder;
+    addRenderPass (
+        width: number,
+        height: number,
+        passName?: string): BasicRenderPassBuilder;
+    addMultisampleRenderPass (
+        width: number,
+        height: number,
+        count: number,
+        quality: number,
+        passName?: string): BasicRenderPassBuilder;
+    addResolvePass (resolvePairs: ResolvePair[]): void;
     addCopyPass (copyPairs: CopyPair[]): void;
     getDescriptorSetLayout (shaderName: string, freq: UpdateFrequency): DescriptorSetLayout | null;
 }
 
+export interface RenderSubpassBuilder extends Setter {
+    addRenderTarget (
+        name: string,
+        accessType: AccessType,
+        slotName?: string,
+        loadOp?: LoadOp,
+        storeOp?: StoreOp,
+        color?: Color): void;
+    addDepthStencil (
+        name: string,
+        accessType: AccessType,
+        depthSlotName?: string,
+        stencilSlotName?: string,
+        loadOp?: LoadOp,
+        storeOp?: StoreOp,
+        depth?: number,
+        stencil?: number,
+        clearFlags?: ClearFlagBit): void;
+    addTexture (
+        name: string,
+        slotName: string,
+        sampler?: Sampler | null,
+        plane?: number): void;
+    addStorageBuffer (
+        name: string,
+        accessType: AccessType,
+        slotName: string): void;
+    addStorageImage (
+        name: string,
+        accessType: AccessType,
+        slotName: string): void;
+    /**
+     * @deprecated method will be removed in 3.9.0
+     */
+    addComputeView (name: string, view: ComputeView): void;
+    setViewport (viewport: Viewport): void;
+    addQueue (hint?: QueueHint, phaseName?: string): RenderQueueBuilder;
+    showStatistics: boolean;
+    /**
+     * @beta function signature might change
+     */
+    setCustomShaderStages (name: string, stageFlags: ShaderStageFlagBit): void;
+}
+
+export interface MultisampleRenderSubpassBuilder extends RenderSubpassBuilder {
+    resolveRenderTarget (source: string, target: string): void;
+    resolveDepthStencil (
+        source: string,
+        target: string,
+        depthMode?: ResolveMode,
+        stencilMode?: ResolveMode): void;
+}
+
+export interface ComputeQueueBuilder extends Setter {
+    addDispatch (
+        threadGroupCountX: number,
+        threadGroupCountY: number,
+        threadGroupCountZ: number,
+        material?: Material,
+        passID?: number): void;
+}
+
+export interface ComputeSubpassBuilder extends Setter {
+    addRenderTarget (name: string, slotName: string): void;
+    addTexture (
+        name: string,
+        slotName: string,
+        sampler?: Sampler | null,
+        plane?: number): void;
+    addStorageBuffer (
+        name: string,
+        accessType: AccessType,
+        slotName: string): void;
+    addStorageImage (
+        name: string,
+        accessType: AccessType,
+        slotName: string): void;
+    /**
+     * @deprecated method will be removed in 3.9.0
+     */
+    addComputeView (name: string, view: ComputeView): void;
+    addQueue (phaseName?: string): ComputeQueueBuilder;
+    /**
+     * @beta function signature might change
+     */
+    setCustomShaderStages (name: string, stageFlags: ShaderStageFlagBit): void;
+}
+
+export interface RenderPassBuilder extends BasicRenderPassBuilder {
+    addStorageBuffer (
+        name: string,
+        accessType: AccessType,
+        slotName: string): void;
+    addStorageImage (
+        name: string,
+        accessType: AccessType,
+        slotName: string): void;
+    /**
+     * @beta function signature might change
+     */
+    addMaterialTexture (resourceName: string, flags?: ShaderStageFlagBit): void;
+    addRenderSubpass (subpassName: string): RenderSubpassBuilder;
+    addMultisampleRenderSubpass (
+        count: number,
+        quality: number,
+        subpassName: string): MultisampleRenderSubpassBuilder;
+    addComputeSubpass (subpassName?: string): ComputeSubpassBuilder;
+    /**
+     * @beta function signature might change
+     */
+    setCustomShaderStages (name: string, stageFlags: ShaderStageFlagBit): void;
+}
+
+export interface ComputePassBuilder extends Setter {
+    addTexture (
+        name: string,
+        slotName: string,
+        sampler?: Sampler | null,
+        plane?: number): void;
+    addStorageBuffer (
+        name: string,
+        accessType: AccessType,
+        slotName: string): void;
+    addStorageImage (
+        name: string,
+        accessType: AccessType,
+        slotName: string): void;
+    addMaterialTexture (resourceName: string, flags?: ShaderStageFlagBit): void;
+    /**
+     * @deprecated method will be removed in 3.9.0
+     */
+    addComputeView (name: string, view: ComputeView): void;
+    addQueue (phaseName?: string): ComputeQueueBuilder;
+    /**
+     * @beta function signature might change
+     */
+    setCustomShaderStages (name: string, stageFlags: ShaderStageFlagBit): void;
+}
+
+export interface SceneVisitor {
+    readonly pipelineSceneData: PipelineSceneData;
+    setViewport (vp: Viewport): void;
+    setScissor (rect: Rect): void;
+    bindPipelineState (pso: PipelineState): void;
+    bindInputAssembler (ia: InputAssembler): void;
+    draw (info: DrawInfo): void;
+
+    bindDescriptorSet (set: number, descriptorSet: DescriptorSet, dynamicOffsets?: number[]): void;
+    updateBuffer (buffer: Buffer, data: ArrayBuffer, size?: number): void;
+}
+
+export interface SceneTask {
+    readonly taskType: TaskType;
+    start (): void;
+    join (): void;
+    submit (): void;
+}
+
+export interface SceneTransversal {
+    transverse (visitor: SceneVisitor): SceneTask;
+}
+
 export interface Pipeline extends BasicPipeline {
-    addStorageBuffer (name: string, format: Format, size: number, residency?: ResourceResidency): number;
-    addStorageTexture (name: string, format: Format, width: number, height: number, residency?: ResourceResidency): number;
-    addShadingRateTexture (name: string, width: number, height: number, residency?: ResourceResidency): number;
-    updateStorageBuffer (name: string, size: number, format?: Format): void;
-    updateStorageTexture (name: string, width: number, height: number, format?: Format): void;
-    updateShadingRateTexture (name: string, width: number, height: number): void;
-    addRenderPass (width: number, height: number, layoutName?: string): RenderPassBuilder;
-    addComputePass (layoutName: string): ComputePassBuilder;
+    addStorageBuffer (
+        name: string,
+        format: Format,
+        size: number,
+        residency?: ResourceResidency): number;
+    addStorageTexture (
+        name: string,
+        format: Format,
+        width: number,
+        height: number,
+        residency?: ResourceResidency): number;
+    addShadingRateTexture (
+        name: string,
+        width: number,
+        height: number,
+        residency?: ResourceResidency): number;
+    updateStorageBuffer (
+        name: string,
+        size: number,
+        format?: Format): void;
+    updateStorageTexture (
+        name: string,
+        width: number,
+        height: number,
+        format?: Format): void;
+    updateShadingRateTexture (
+        name: string,
+        width: number,
+        height: number): void;
+    addRenderPass (
+        width: number,
+        height: number,
+        passName: string): RenderPassBuilder;
+    addComputePass (passName: string): ComputePassBuilder;
+    addUploadPass (uploadPairs: UploadPair[]): void;
     addMovePass (movePairs: MovePair[]): void;
     /**
      * @beta function signature might change
      */
-    addCustomBuffer (name: string, info: BufferInfo, type: string): number;
+    addCustomBuffer (
+        name: string,
+        info: BufferInfo,
+        type: string): number;
     /**
      * @beta function signature might change
      */
-    addCustomTexture (name: string, info: TextureInfo, type: string): number;
+    addCustomTexture (
+        name: string,
+        info: TextureInfo,
+        type: string): number;
 }
 
 export interface PipelineBuilder {
@@ -287,8 +454,6 @@ export interface PipelineBuilder {
 
 export interface RenderingModule {
     getPassID (name: string): number;
-    getPhaseID (passID: number, name: string): number;
-}
-
-export class Factory {
+    getSubpassID (passID: number, name: string): number;
+    getPhaseID (subpassOrPassID: number, name: string): number;
 }

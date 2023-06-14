@@ -263,7 +263,7 @@ void completeBarrier(GLES3GPUGeneralBarrier *barrier);
 
 void cmdFuncGLES3Query(GLES3Device *device, GLES3QueryPool *query, GLES3QueryType type, uint32_t id);
 
-void cmdFuncGLES3BeginRenderPass(GLES3Device *device, uint32_t subpassIdx,
+void cmdFuncGLES3BeginRenderPass(GLES3Device *device,
                                  GLES3GPURenderPass *gpuRenderPass = nullptr,
                                  GLES3GPUFramebuffer *gpuFramebuffer = nullptr,
                                  const Rect *renderArea = nullptr,
@@ -281,6 +281,12 @@ void cmdFuncGLES3BindState(GLES3Device *device,
                            const DynamicStates *dynamicStates = nullptr);
 
 void cmdFuncGLES3Draw(GLES3Device *device, const DrawInfo &drawInfo);
+void cmdFuncGLES3DrawIndirect(GLES3Device *device,
+                              GLES3GPUBuffer *gpuBuffer,
+                              uint32_t offset,
+                              uint32_t count,
+                              uint32_t stride,
+                              bool indexed);
 
 void cmdFuncGLES3UpdateBuffer(GLES3Device *device,
                               GLES3GPUBuffer *gpuBuffer,

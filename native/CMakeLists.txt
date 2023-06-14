@@ -547,6 +547,7 @@ elseif(ANDROID)
     cocos_source_files(
         cocos/platform/android/AndroidPlatform.cpp
         cocos/platform/android/AndroidPlatform.h
+        cocos/platform/android/AndroidKeyCodes.cpp
     )
 elseif(OPENHARMONY)
     cocos_source_files(
@@ -1425,6 +1426,7 @@ cocos_source_files(
                  cocos/renderer/pipeline/custom/NativeRenderGraph.cpp
                  cocos/renderer/pipeline/custom/NativeRenderQueue.cpp
                  cocos/renderer/pipeline/custom/NativeRenderingModule.cpp
+                 cocos/renderer/pipeline/custom/NativeSceneCulling.cpp
                  cocos/renderer/pipeline/custom/NativeTypes.cpp
                  cocos/renderer/pipeline/custom/NativeTypes.h
                  cocos/renderer/pipeline/custom/NativeUtils.cpp
@@ -1515,6 +1517,15 @@ cocos_source_files(
                  cocos/scene/ReflectionProbe.cpp
                  cocos/scene/ReflectionProbeManager.cpp
                  cocos/scene/ReflectionProbeManager.h
+                 cocos/scene/gpu-scene/Define.h
+                 cocos/scene/gpu-scene/GPUBatchPool.cpp
+                 cocos/scene/gpu-scene/GPUBatchPool.h
+                 cocos/scene/gpu-scene/GPUObjectPool.cpp
+                 cocos/scene/gpu-scene/GPUObjectPool.h
+                 cocos/scene/gpu-scene/GPUMeshPool.cpp
+                 cocos/scene/gpu-scene/GPUMeshPool.h
+                 cocos/scene/gpu-scene/GPUScene.cpp
+                 cocos/scene/gpu-scene/GPUScene.h
 )
 
 ##### primitive
@@ -3023,6 +3034,7 @@ function(cc_apply_definations target)
         $<IF:$<BOOL:${USE_GEOMETRY_RENDERER}>,CC_USE_GEOMETRY_RENDERER=1,CC_USE_GEOMETRY_RENDERER=0>
         $<IF:$<BOOL:${USE_WEBP}>,CC_USE_WEBP=1,CC_USE_WEBP=0>
         $<IF:$<BOOL:${CC_EDITOR}>,CC_EDITOR=1,CC_EDITOR=0>
+        $<IF:$<BOOL:${ENABLE_FLOAT_OUTPUT}>,ENABLE_FLOAT_OUTPUT=1,ENABLE_FLOAT_OUTPUT=0>
         $<$<BOOL:${USE_REMOTE_LOG}>:CC_REMOTE_LOG=1>
         $<$<BOOL:${USE_SE_SM}>:SCRIPT_ENGINE_TYPE=1>
         $<$<OR:$<CONFIG:Debug>,$<BOOL:${CC_DEBUG_FORCE}>>:CC_DEBUG=1>

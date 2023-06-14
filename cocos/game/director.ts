@@ -27,7 +27,7 @@
 
 /* spell-checker:words COORD, Quesada, INITED, Renerer */
 
-import { DEBUG, EDITOR, BUILD, TEST } from 'internal:constants';
+import { DEBUG, EDITOR, BUILD, TEST, EDITOR_NOT_IN_PREVIEW } from 'internal:constants';
 import { SceneAsset } from '../asset/assets/scene-asset';
 import { System, EventTarget, Scheduler, js, errorID, error, assertID, warnID, macro, CCObject, cclegacy, isValid } from '../core';
 import { input } from '../input';
@@ -40,6 +40,8 @@ import { uiRendererManager } from '../2d/framework/ui-renderer-manager';
 import { assetManager } from '../asset/asset-manager';
 import { deviceManager } from '../gfx';
 import { releaseManager } from '../asset/asset-manager/release-manager';
+import { MeshRenderer } from '../3d/framework/mesh-renderer';
+import { Mesh } from '../3d/assets/mesh';
 
 // ----------------------------------------------------------------------------------------------------------------------
 
@@ -218,6 +220,8 @@ export class Director extends EventTarget {
         this._nodeActivator = new NodeActivator();
 
         this._systems = [];
+
+        this.on(Director.EVENT_BEFORE_SCENE_LAUNCH, this.buildGPUScene, this);
     }
 
     /**
@@ -371,6 +375,10 @@ export class Director extends EventTarget {
         if (onBeforeLoadScene) {
             onBeforeLoadScene();
         }
+
+        if (scene.renderScene) {
+            scene.renderScene.activate();
+        }
         this.emit(Director.EVENT_BEFORE_SCENE_LAUNCH, scene);
 
         // Run an Entity Scene
@@ -498,6 +506,26 @@ export class Director extends EventTarget {
             }
             error(`preloadScene: ${err}`);
         }
+    }
+
+    public buildGPUScene (scene: Scene) {
+        const sceneData = this.root!.pipeline.pipelineSceneData;
+        if (!sceneData || !sceneData.isGPUDrivenEnabled()) {
+            return;
+        }
+
+        const renderers = scene.getComponentsInChildren(MeshRenderer);
+        const meshes: Mesh[] = [];
+
+        for (let i = 0; i < renderers.length; i++) {
+            const renderer = renderers[i];
+            const mesh = renderer.mesh;
+            if (renderer.isUseGPUScene()) {
+                meshes.push(mesh!);
+            }
+        }
+
+        scene.renderScene?.buildGPUScene(meshes);
     }
 
     /**
@@ -649,7 +677,7 @@ export class Director extends EventTarget {
      */
     public mainLoop (now: number) {
         let dt;
-        if (EDITOR && !cclegacy.GAME_VIEW || TEST) {
+        if (EDITOR_NOT_IN_PREVIEW || TEST) {
             dt = now;
         } else {
             dt = cclegacy.game._calculateDT(now);
@@ -665,7 +693,7 @@ export class Director extends EventTarget {
     public tick (dt: number) {
         if (!this._invalid) {
             this.emit(Director.EVENT_BEGIN_FRAME);
-            if (!EDITOR || cclegacy.GAME_VIEW) {
+            if (!EDITOR_NOT_IN_PREVIEW) {
                 input._frameDispatchEvents();
             }
 

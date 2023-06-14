@@ -1,11 +1,57 @@
+/* eslint-disable quote-props */
 const pkg = require('../../../package.json');
+const { mixin, link } = require('../../i18n-utils');
 const version = pkg.version.replace(/(^\d+\.\d+)\..*$/, (str, a) => {
     return a;
 });
 
 const url = 'https://docs.cocos.com/creator';
 
-module.exports = {
+module.exports = link(mixin({
+
+    classes: {
+        'cc': {
+            'animation': {
+                'TCVariableBinding': {
+                    menu: 'Variable Binding',
+                    tooltip: 'Use the variable\'s value as condition value.',
+                    properties: {
+                        'variableName': {
+                            label: 'Variable',
+                            tooltip: 'Variable name.',
+                        },
+                    },
+                },
+                'TCAuxiliaryCurveBinding': {
+                    menu: 'Auxiliary Curve Binding',
+                    tooltip: 'Use the auxiliary curve \'s current value as condition value.',
+                    properties: {
+                        'curveName': {
+                            label: 'Curve',
+                            tooltip: 'Auxiliary curve name.',
+                        },
+                    },
+                },
+                'TCStateWeightBinding': {
+                    menu: 'State Weight Binding',
+                    tooltip: 'Use the state \'s weight as condition value.',
+                    abbr: {
+                        label: 'State Weight',
+                        tooltip: 'The current weight of transition source state.',
+                    },
+                },
+                'TCStateMotionTimeBinding': {
+                    menu: 'Motion Time Binding',
+                    tooltip: 'Use the elapsed (normalized) time of motions in state as condition value.',
+                    abbr: {
+                        label: 'Motion Elapsed Time',
+                        tooltip: 'The elapsed (normalized) time of motions in transition source state.',
+                    },
+                },
+            },
+        },
+    },
+
     help: {
         cc: {
             Node: `${url}/${version}/manual/en/concepts/scene/node-component.html`,
@@ -1035,6 +1081,10 @@ module.exports = {
             label: "Marionette Animation System",
             description: "Enable the Marionette animation system",
         },
+        procedural_animation: {
+            label: "Procedural Animation",
+            description: "Enable the procedural animation related features, such as pose graph etc.",
+        },
         xr: {
             label: "XR",
             description: "Enable the XR function system",
@@ -1227,4 +1277,8 @@ module.exports = {
     color_grading: {
         originalMap: 'The builtin lut texture path is internal/dependencies/textures/lut/.',
     },
-};
+},
+
+require('./animation'),
+
+));

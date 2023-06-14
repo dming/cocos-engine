@@ -31,9 +31,10 @@
 import { AdjI, AdjacencyGraph, BidirectionalGraph, ComponentGraph, ED, InEI, MutableGraph, MutableReferenceGraph, NamedGraph, OutE, OutEI, PolymorphicGraph, PropertyGraph, PropertyMap, ReferenceGraph, UuidGraph, VertexListGraph, directional, parallel, reindexEdgeList, traversal } from './graph';
 import { Material } from '../../asset/assets';
 import { Camera } from '../../render-scene/scene/camera';
-import { AccessFlagBit, Buffer, ClearFlagBit, Color, Format, Framebuffer, RenderPass, SampleCount, Sampler, SamplerInfo, Swapchain, Texture, TextureFlagBit, Viewport } from '../../gfx';
-import { ComputeView, CopyPair, LightInfo, MovePair, QueueHint, RasterView, ResourceDimension, ResourceFlags, ResourceResidency, SceneFlags } from './types';
+import { AccessFlagBit, Buffer, ClearFlagBit, Color, Format, Framebuffer, RenderPass, SampleCount, Sampler, SamplerInfo, ShaderStageFlagBit, Swapchain, Texture, TextureFlagBit, Viewport } from '../../gfx';
+import { ComputeView, CopyPair, LightInfo, MovePair, QueueHint, RasterView, ResolvePair, ResourceDimension, ResourceFlags, ResourceResidency, SceneFlags, UploadPair } from './types';
 import { RenderScene } from '../../render-scene/core/render-scene';
+import { RenderWindow } from '../../render-scene/core/render-window';
 
 export class ResourceDesc {
     dimension: ResourceDimension = ResourceDimension.BUFFER;
@@ -60,6 +61,7 @@ export class RenderSwapchain {
         this.swapchain = swapchain;
     }
     /*pointer*/ swapchain: Swapchain | null;
+    /*pointer*/ renderWindow: RenderWindow | null = null;
     currentID = 0;
     numBackBuffers = 0;
     generation = 0xFFFFFFFF;
@@ -398,13 +400,18 @@ export class SubpassGraph implements BidirectionalGraph
 }
 
 export class RasterSubpass {
-    constructor (subpassID: number) {
+    constructor (subpassID: number, count: number, quality: number) {
         this.subpassID = subpassID;
+        this.count = count;
+        this.quality = quality;
     }
     readonly rasterViews: Map<string, RasterView> = new Map<string, RasterView>();
     readonly computeViews: Map<string, ComputeView[]> = new Map<string, ComputeView[]>();
-    subpassID: number;
+    readonly resolvePairs: ResolvePair[] = [];
     readonly viewport: Viewport = new Viewport();
+    subpassID: number;
+    count: number;
+    quality: number;
     showStatistics = false;
 }
 
@@ -420,9 +427,13 @@ export class ComputeSubpass {
 export class RasterPass {
     readonly rasterViews: Map<string, RasterView> = new Map<string, RasterView>();
     readonly computeViews: Map<string, ComputeView[]> = new Map<string, ComputeView[]>();
+    readonly attachmentIndexMap: Map<string, number> = new Map<string, number>();
+    readonly textures: Map<string, ShaderStageFlagBit> = new Map<string, ShaderStageFlagBit>();
     readonly subpassGraph: SubpassGraph = new SubpassGraph();
     width = 0;
     height = 0;
+    count = 1;
+    quality = 0;
     readonly viewport: Viewport = new Viewport();
     versionName = '';
     version = 0;
@@ -442,6 +453,21 @@ export class PersistentRenderPassAndFramebuffer {
     clearStencil = 0;
 }
 
+export class FormatView {
+    format: Format = Format.UNKNOWN;
+}
+
+export class SubresourceView {
+    /*refcount*/ textureView: Texture | null = null;
+    format: Format = Format.UNKNOWN;
+    indexOrFirstMipLevel = 0;
+    numMipLevels = 0;
+    firstArraySlice = 0;
+    numArraySlices = 0;
+    firstPlane = 0;
+    numPlanes = 0;
+}
+
 //=================================================================
 // ResourceGraph
 //=================================================================
@@ -454,6 +480,8 @@ export const enum ResourceGraphValue {
     PersistentTexture,
     Framebuffer,
     Swapchain,
+    FormatView,
+    SubresourceView,
 }
 
 export function getResourceGraphValueName (e: ResourceGraphValue): string {
@@ -465,6 +493,8 @@ export function getResourceGraphValueName (e: ResourceGraphValue): string {
     case ResourceGraphValue.PersistentTexture: return 'PersistentTexture';
     case ResourceGraphValue.Framebuffer: return 'Framebuffer';
     case ResourceGraphValue.Swapchain: return 'Swapchain';
+    case ResourceGraphValue.FormatView: return 'FormatView';
+    case ResourceGraphValue.SubresourceView: return 'SubresourceView';
     default: return '';
     }
 }
@@ -477,6 +507,8 @@ export interface ResourceGraphValueType {
     [ResourceGraphValue.PersistentTexture]: Texture
     [ResourceGraphValue.Framebuffer]: Framebuffer
     [ResourceGraphValue.Swapchain]: RenderSwapchain
+    [ResourceGraphValue.FormatView]: FormatView
+    [ResourceGraphValue.SubresourceView]: SubresourceView
 }
 
 export interface ResourceGraphVisitor {
@@ -487,6 +519,8 @@ export interface ResourceGraphVisitor {
     persistentTexture(value: Texture): unknown;
     framebuffer(value: Framebuffer): unknown;
     swapchain(value: RenderSwapchain): unknown;
+    formatView(value: FormatView): unknown;
+    subresourceView(value: SubresourceView): unknown;
 }
 
 export type ResourceGraphObject = ManagedResource
@@ -495,7 +529,9 @@ export type ResourceGraphObject = ManagedResource
 | Buffer
 | Texture
 | Framebuffer
-| RenderSwapchain;
+| RenderSwapchain
+| FormatView
+| SubresourceView;
 
 //-----------------------------------------------------------------
 // Graph Concept
@@ -604,6 +640,8 @@ export class ResourceGraph implements BidirectionalGraph
 , NamedGraph
 , ComponentGraph
 , PolymorphicGraph
+, ReferenceGraph
+, MutableReferenceGraph
 , UuidGraph<string> {
     //-----------------------------------------------------------------
     // Graph
@@ -701,6 +739,7 @@ export class ResourceGraph implements BidirectionalGraph
         traits: ResourceTraits,
         states: ResourceStates,
         sampler: SamplerInfo,
+        u = 0xFFFFFFFF,
     ): number {
         const vert = new ResourceGraphVertex(id, object);
         const v = this._vertices.length;
@@ -712,9 +751,16 @@ export class ResourceGraph implements BidirectionalGraph
         this._samplerInfo.push(sampler);
         // UuidGraph
         this._valueIndex.set(name, v);
+
+        // ReferenceGraph
+        if (u !== 0xFFFFFFFF) {
+            this.addEdge(u, v);
+        }
+
         return v;
     }
     clearVertex (v: number): void {
+        // ReferenceGraph(Alias)
         const vert = this._vertices[v];
         // clear out edges
         for (const oe of vert._outEdges) {
@@ -937,6 +983,10 @@ export class ResourceGraph implements BidirectionalGraph
             return visitor.framebuffer(vert._object as Framebuffer);
         case ResourceGraphValue.Swapchain:
             return visitor.swapchain(vert._object as RenderSwapchain);
+        case ResourceGraphValue.FormatView:
+            return visitor.formatView(vert._object as FormatView);
+        case ResourceGraphValue.SubresourceView:
+            return visitor.subresourceView(vert._object as SubresourceView);
         default:
             throw Error('polymorphic type not found');
         }
@@ -990,6 +1040,20 @@ export class ResourceGraph implements BidirectionalGraph
             throw Error('value id not match');
         }
     }
+    getFormatView (v: number): FormatView {
+        if (this._vertices[v]._id === ResourceGraphValue.FormatView) {
+            return this._vertices[v]._object as FormatView;
+        } else {
+            throw Error('value id not match');
+        }
+    }
+    getSubresourceView (v: number): SubresourceView {
+        if (this._vertices[v]._id === ResourceGraphValue.SubresourceView) {
+            return this._vertices[v]._object as SubresourceView;
+        } else {
+            throw Error('value id not match');
+        }
+    }
     tryGetManaged (v: number): ManagedResource | null {
         if (this._vertices[v]._id === ResourceGraphValue.Managed) {
             return this._vertices[v]._object as ManagedResource;
@@ -1039,6 +1103,95 @@ export class ResourceGraph implements BidirectionalGraph
             return null;
         }
     }
+    tryGetFormatView (v: number): FormatView | null {
+        if (this._vertices[v]._id === ResourceGraphValue.FormatView) {
+            return this._vertices[v]._object as FormatView;
+        } else {
+            return null;
+        }
+    }
+    tryGetSubresourceView (v: number): SubresourceView | null {
+        if (this._vertices[v]._id === ResourceGraphValue.SubresourceView) {
+            return this._vertices[v]._object as SubresourceView;
+        } else {
+            return null;
+        }
+    }
+    //-----------------------------------------------------------------
+    // ReferenceGraph
+    // type reference_descriptor = ED;
+    // type child_iterator = OutEI;
+    // type parent_iterator = InEI;
+    reference (u: number, v: number): boolean {
+        for (const oe of this._vertices[u]._outEdges) {
+            if (v === oe.target as number) {
+                return true;
+            }
+        }
+        return false;
+    }
+    parent (e: ED): number {
+        return e.source as number;
+    }
+    child (e: ED): number {
+        return e.target as number;
+    }
+    parents (v: number): InEI {
+        return new InEI(this._vertices[v]._inEdges.values(), v);
+    }
+    children (v: number): OutEI {
+        return new OutEI(this._vertices[v]._outEdges.values(), v);
+    }
+    numParents (v: number): number {
+        return this._vertices[v]._inEdges.length;
+    }
+    numChildren (v: number): number {
+        return this._vertices[v]._outEdges.length;
+    }
+    getParent (v: number): number {
+        if (v === 0xFFFFFFFF) {
+            return 0xFFFFFFFF;
+        }
+        const list = this._vertices[v]._inEdges;
+        if (list.length === 0) {
+            return 0xFFFFFFFF;
+        } else {
+            return list[0].target as number;
+        }
+    }
+    isAncestor (ancestor: number, descendent: number): boolean {
+        const pseudo = 0xFFFFFFFF;
+        if (ancestor === descendent) {
+            // when ancestor === descendent, is_ancestor is defined as false
+            return false;
+        }
+        if (ancestor === pseudo) {
+            // special case: pseudo root is always ancestor
+            return true;
+        }
+        if (descendent === pseudo) {
+            // special case: pseudo root is never descendent
+            return false;
+        }
+        for (let parent = this.getParent(descendent); parent !== pseudo;) {
+            if (ancestor === parent) {
+                return true;
+            }
+            parent = this.getParent(parent);
+        }
+        return false;
+    }
+    //-----------------------------------------------------------------
+    // MutableReferenceGraph
+    addReference (u: number, v: number): ED | null {
+        return this.addEdge(u, v);
+    }
+    removeReference (e: ED): void {
+        return this.removeEdge(e);
+    }
+    removeReferences (u: number, v: number): void {
+        return this.removeEdges(u, v);
+    }
     //-----------------------------------------------------------------
     // UuidGraph
     contains (key: string): boolean {
@@ -1068,10 +1221,16 @@ export class ResourceGraph implements BidirectionalGraph
 
 export class ComputePass {
     readonly computeViews: Map<string, ComputeView[]> = new Map<string, ComputeView[]>();
+    readonly textures: Map<string, ShaderStageFlagBit> = new Map<string, ShaderStageFlagBit>();
+}
+
+export class ResolvePass {
+    readonly resolvePairs: ResolvePair[] = [];
 }
 
 export class CopyPass {
     readonly copyPairs: CopyPair[] = [];
+    readonly uploadPairs: UploadPair[] = [];
 }
 
 export class MovePass {
@@ -1104,16 +1263,16 @@ export class RenderQueue {
 }
 
 export class SceneData {
-    constructor (name = '', flags: SceneFlags = SceneFlags.NONE, light: LightInfo = new LightInfo()) {
-        this.name = name;
+    constructor (scene: RenderScene | null = null, camera: Camera | null = null, flags: SceneFlags = SceneFlags.NONE, light: LightInfo = new LightInfo()) {
+        this.scene = scene;
+        this.camera = camera;
         this.light = light;
         this.flags = flags;
     }
-    name: string;
-    /*pointer*/ camera: Camera | null = null;
+    /*pointer*/ scene: RenderScene | null;
+    /*pointer*/ camera: Camera | null;
     readonly light: LightInfo;
     flags: SceneFlags;
-    readonly scenes: RenderScene[] = [];
 }
 
 export class Dispatch {
@@ -1167,6 +1326,7 @@ export const enum RenderGraphValue {
     RasterSubpass,
     ComputeSubpass,
     Compute,
+    Resolve,
     Copy,
     Move,
     Raytrace,
@@ -1184,6 +1344,7 @@ export function getRenderGraphValueName (e: RenderGraphValue): string {
     case RenderGraphValue.RasterSubpass: return 'RasterSubpass';
     case RenderGraphValue.ComputeSubpass: return 'ComputeSubpass';
     case RenderGraphValue.Compute: return 'Compute';
+    case RenderGraphValue.Resolve: return 'Resolve';
     case RenderGraphValue.Copy: return 'Copy';
     case RenderGraphValue.Move: return 'Move';
     case RenderGraphValue.Raytrace: return 'Raytrace';
@@ -1202,6 +1363,7 @@ export interface RenderGraphValueType {
     [RenderGraphValue.RasterSubpass]: RasterSubpass
     [RenderGraphValue.ComputeSubpass]: ComputeSubpass
     [RenderGraphValue.Compute]: ComputePass
+    [RenderGraphValue.Resolve]: ResolvePass
     [RenderGraphValue.Copy]: CopyPass
     [RenderGraphValue.Move]: MovePass
     [RenderGraphValue.Raytrace]: RaytracePass
@@ -1218,6 +1380,7 @@ export interface RenderGraphVisitor {
     rasterSubpass(value: RasterSubpass): unknown;
     computeSubpass(value: ComputeSubpass): unknown;
     compute(value: ComputePass): unknown;
+    resolve(value: ResolvePass): unknown;
     copy(value: CopyPass): unknown;
     move(value: MovePass): unknown;
     raytrace(value: RaytracePass): unknown;
@@ -1233,6 +1396,7 @@ export type RenderGraphObject = RasterPass
 | RasterSubpass
 | ComputeSubpass
 | ComputePass
+| ResolvePass
 | CopyPass
 | MovePass
 | RaytracePass
@@ -1691,6 +1855,8 @@ export class RenderGraph implements BidirectionalGraph
             return visitor.computeSubpass(vert._object as ComputeSubpass);
         case RenderGraphValue.Compute:
             return visitor.compute(vert._object as ComputePass);
+        case RenderGraphValue.Resolve:
+            return visitor.resolve(vert._object as ResolvePass);
         case RenderGraphValue.Copy:
             return visitor.copy(vert._object as CopyPass);
         case RenderGraphValue.Move:
@@ -1737,6 +1903,13 @@ export class RenderGraph implements BidirectionalGraph
     getCompute (v: number): ComputePass {
         if (this._vertices[v]._id === RenderGraphValue.Compute) {
             return this._vertices[v]._object as ComputePass;
+        } else {
+            throw Error('value id not match');
+        }
+    }
+    getResolve (v: number): ResolvePass {
+        if (this._vertices[v]._id === RenderGraphValue.Resolve) {
+            return this._vertices[v]._object as ResolvePass;
         } else {
             throw Error('value id not match');
         }
@@ -1828,6 +2001,13 @@ export class RenderGraph implements BidirectionalGraph
     tryGetCompute (v: number): ComputePass | null {
         if (this._vertices[v]._id === RenderGraphValue.Compute) {
             return this._vertices[v]._object as ComputePass;
+        } else {
+            return null;
+        }
+    }
+    tryGetResolve (v: number): ResolvePass | null {
+        if (this._vertices[v]._id === RenderGraphValue.Resolve) {
+            return this._vertices[v]._object as ResolvePass;
         } else {
             return null;
         }

@@ -1,16 +1,36 @@
 import { EDITOR } from 'internal:constants';
-import { builtinResMgr } from '../../../asset/asset-manager';
 
-import { Material, RenderTexture } from '../../../asset/assets';
-import { director } from '../../../game';
-import { Rect } from '../../../gfx';
-import { MaterialInstance } from '../../../render-scene';
+import { Material } from '../../../asset/assets';
 import { Camera } from '../../../render-scene/scene';
-import { getCameraUniqueID, getRenderArea } from '../../custom/define';
-import { Pipeline } from '../../custom/pipeline';
+import { getCameraUniqueID } from '../../custom/define';
+import { BasicPipeline, Pipeline, PipelineRuntime } from '../../custom/pipeline';
 import { passContext } from '../utils/pass-context';
+import { Format } from '../../../gfx';
+import { supportsRGBA16HalfFloatTexture } from '../../define';
+import { cclegacy, macro } from '../../../core';
 
 let _BasePassID = 0;
+
+export function getRTFormatBeforeToneMapping (ppl: BasicPipeline) {
+    const useFloatOutput = ppl.getMacroBool('CC_USE_FLOAT_OUTPUT');
+    return ppl.pipelineSceneData.isHDR && useFloatOutput && supportsRGBA16HalfFloatTexture(ppl.device) ? Format.RGBA16F : Format.RGBA8;
+}
+export function forceEnableFloatOutput (ppl: PipelineRuntime) {
+    let enabled = ppl.getMacroBool('CC_USE_FLOAT_OUTPUT');
+    if (ppl.pipelineSceneData.isHDR && !enabled) {
+        const supportFloatOutput = supportsRGBA16HalfFloatTexture(ppl.device);
+        ppl.setMacroBool('CC_USE_FLOAT_OUTPUT', supportFloatOutput);
+        macro.ENABLE_FLOAT_OUTPUT = supportFloatOutput;
+        enabled = supportFloatOutput;
+    }
+
+    return enabled;
+}
+
+export function disablePostProcessForDebugView () {
+    const debugView = cclegacy.director.root.debugView;
+    return debugView.singleMode as number > 0;
+}
 
 export abstract class BasePass {
     abstract name: string;
@@ -73,9 +93,8 @@ export abstract class BasePass {
     }
 
     renderProfiler (camera) {
-        if (passContext.renderProfiler && !EDITOR) {
+        if (passContext.isFinalCamera && !EDITOR) {
             passContext.pass!.showStatistics = true;
-            passContext.renderProfiler = false;
         }
     }
 

@@ -70,7 +70,7 @@ RenderingSubMesh::RenderingSubMesh(const gfx::BufferList &vertexBuffers,
     _iaInfo.attributes = attributes;
     _iaInfo.vertexBuffers = vertexBuffers;
     _iaInfo.indexBuffer = indexBuffer;
-    _iaInfo.indirectBuffer = indirectBuffer;
+    _id = generateId();
 }
 
 RenderingSubMesh::~RenderingSubMesh() {
@@ -218,7 +218,15 @@ bool RenderingSubMesh::destroy() {
         _jointMappedBuffers.clear();
         _jointMappedBufferIndices.clear();
     }
+
+    _iaInfo.vertexBuffers.clear();
+    _iaInfo.indexBuffer = nullptr;
+
     return true;
+}
+
+bool RenderingSubMesh::canUseGPUScene() const {
+    return _mesh && _mesh->canUseGPUScene();
 }
 
 const gfx::BufferList &RenderingSubMesh::getJointMappedBuffers() {

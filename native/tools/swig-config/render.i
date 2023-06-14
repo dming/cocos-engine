@@ -74,8 +74,17 @@ using namespace cc::render;
 %module_macro(CC_USE_GEOMETRY_RENDERER) cc::render::PipelineRuntime::geometryRenderer;
 
 // ----- Release Returned Cpp Object in GC Section ------
+%release_returned_cpp_object_in_gc(cc::render::BasicRenderPassBuilder::addQueue);
+%release_returned_cpp_object_in_gc(cc::render::BasicPipeline::addRenderPass);
+%release_returned_cpp_object_in_gc(cc::render::BasicPipeline::addMultisampleRenderPass);
+%release_returned_cpp_object_in_gc(cc::render::RenderSubpassBuilder::addQueue);
+%release_returned_cpp_object_in_gc(cc::render::ComputeSubpassBuilder::addQueue);
+%release_returned_cpp_object_in_gc(cc::render::RenderPassBuilder::addRenderSubpass);
+%release_returned_cpp_object_in_gc(cc::render::RenderPassBuilder::addMultisampleRenderSubpass);
+%release_returned_cpp_object_in_gc(cc::render::RenderPassBuilder::addComputeSubpass);
+%release_returned_cpp_object_in_gc(cc::render::ComputePassBuilder::addQueue);
 %release_returned_cpp_object_in_gc(cc::render::Pipeline::addRenderPass);
-%release_returned_cpp_object_in_gc(cc::render::RenderPassBuilder::addQueue);
+%release_returned_cpp_object_in_gc(cc::render::Pipeline::addComputePass);
 
 // ----- Attribute Section ------
 // Brief: Define attributes ( JS properties with getter and setter )
@@ -105,12 +114,12 @@ using namespace cc::render;
 %attribute(cc::render::PipelineRuntime, cc::pipeline::GeometryRenderer*, geometryRenderer, getGeometryRenderer);
 %attribute(cc::render::PipelineRuntime, float, shadingScale, getShadingScale, setShadingScale);
 %attribute(cc::render::RenderNode, ccstd::string, name, getName, setName);
-%attribute(cc::render::RenderSubpassBuilder, bool, showStatistics, getShowStatistics, setShowStatistics);
 %attribute(cc::render::BasicRenderPassBuilder, bool, showStatistics, getShowStatistics, setShowStatistics);
-%attribute(cc::render::SceneVisitor, cc::pipeline::PipelineSceneData*, pipelineSceneData, getPipelineSceneData);
-%attribute(cc::render::SceneTask, cc::render::TaskType, taskType, getTaskType);
 %attribute(cc::render::BasicPipeline, cc::render::PipelineType, type, getType);
 %attribute(cc::render::BasicPipeline, cc::render::PipelineCapabilities, capabilities, getCapabilities);
+%attribute(cc::render::RenderSubpassBuilder, bool, showStatistics, getShowStatistics, setShowStatistics);
+%attribute(cc::render::SceneVisitor, cc::pipeline::PipelineSceneData*, pipelineSceneData, getPipelineSceneData);
+%attribute(cc::render::SceneTask, cc::render::TaskType, taskType, getTaskType);
 
 // ----- Import Section ------
 // Brief: Import header files which are depended by 'Include Section'

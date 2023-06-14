@@ -22,7 +22,7 @@
  THE SOFTWARE.
 */
 
-import { debug, error, errorID, CachedArray, cclegacy } from '../../core';
+import { debug, error, errorID, CachedArray, cclegacy, assertID } from '../../core';
 import { WebGLCommandAllocator } from './webgl-command-allocator';
 import { WebGLEXT } from './webgl-define';
 import { WebGLDevice } from './webgl-device';
@@ -777,12 +777,6 @@ export function WebGLCmdFuncUpdateBuffer (device: WebGLDevice, gpuBuffer: IWebGL
         } else {
             gpuBuffer.vf32!.set(new Float32Array(buffer as ArrayBuffer), offset / Float32Array.BYTES_PER_ELEMENT);
         }
-    } else if (gpuBuffer.usage & BufferUsageBit.INDIRECT) {
-        gpuBuffer.indirects.clearDraws();
-        const drawInfos = (buffer as IndirectBuffer).drawInfos;
-        for (let i = 0; i < drawInfos.length; ++i) {
-            gpuBuffer.indirects.setDrawInfo(offset + i, drawInfos[i]);
-        }
     } else {
         const buff = buffer as ArrayBuffer;
         const { gl } = device;
@@ -1492,7 +1486,7 @@ export function WebGLCmdFuncCreateShader (device: WebGLDevice, gpuShader: IWebGL
                 glActiveSamplerLocations.push(glLoc);
             }
             if (texUnitCacheMap[sampler.name] === undefined) {
-                texUnitCacheMap[sampler.name] = sampler.flattened;
+                texUnitCacheMap[sampler.name] = sampler.flattened % device.capabilities.maxTextureUnits;
             }
         }
     }
@@ -2567,60 +2561,7 @@ export function WebGLCmdFuncDraw (device: WebGLDevice, drawInfo: Readonly<DrawIn
 
     if (gpuInputAssembler) {
         const indexBuffer = gpuInputAssembler.gpuIndexBuffer;
-        if (gpuInputAssembler.gpuIndirectBuffer) {
-            const indirects = gpuInputAssembler.gpuIndirectBuffer.indirects;
-            if (indirects.drawByIndex) {
-                for (let j = 0; j < indirects.drawCount; j++) {
-                    indirects.byteOffsets[j] = indirects.offsets[j] * indexBuffer!.stride;
-                }
-                if (md) {
-                    if (indirects.instancedDraw) {
-                        md.multiDrawElementsInstancedWEBGL(glPrimitive,
-                            indirects.counts, 0,
-                            gpuInputAssembler.glIndexType,
-                            indirects.byteOffsets, 0,
-                            indirects.instances, 0,
-                            indirects.drawCount);
-                    } else {
-                        md.multiDrawElementsWEBGL(glPrimitive,
-                            indirects.counts, 0,
-                            gpuInputAssembler.glIndexType,
-                            indirects.byteOffsets, 0,
-                            indirects.drawCount);
-                    }
-                } else {
-                    for (let j = 0; j < indirects.drawCount; j++) {
-                        if (indirects.instances[j] && ia) {
-                            ia.drawElementsInstancedANGLE(glPrimitive, indirects.counts[j],
-                                gpuInputAssembler.glIndexType, indirects.byteOffsets[j], indirects.instances[j]);
-                        } else {
-                            gl.drawElements(glPrimitive, indirects.counts[j], gpuInputAssembler.glIndexType, indirects.byteOffsets[j]);
-                        }
-                    }
-                }
-            } else if (md) {
-                if (indirects.instancedDraw) {
-                    md.multiDrawArraysInstancedWEBGL(glPrimitive,
-                        indirects.offsets, 0,
-                        indirects.counts, 0,
-                        indirects.instances, 0,
-                        indirects.drawCount);
-                } else {
-                    md.multiDrawArraysWEBGL(glPrimitive,
-                        indirects.offsets, 0,
-                        indirects.counts, 0,
-                        indirects.drawCount);
-                }
-            } else {
-                for (let j = 0; j < indirects.drawCount; j++) {
-                    if (indirects.instances[j] && ia) {
-                        ia.drawArraysInstancedANGLE(glPrimitive, indirects.offsets[j], indirects.counts[j], indirects.instances[j]);
-                    } else {
-                        gl.drawArrays(glPrimitive, indirects.offsets[j], indirects.counts[j]);
-                    }
-                }
-            }
-        } else if (drawInfo.instanceCount && ia) {
+        if (drawInfo.instanceCount && ia) {
             if (indexBuffer) {
                 if (drawInfo.indexCount > 0) {
                     const offset = drawInfo.firstIndex * indexBuffer.stride;
@@ -2777,7 +2718,9 @@ function pixelBufferPick (buffer: ArrayBufferView,
             bufferOffset += rowStride;
         }
     }
-    return new ArrayBufferCtor(stagingBuffer.buffer);
+    const length = bufferSize / ArrayBufferCtor.BYTES_PER_ELEMENT;
+    assertID(Number.isInteger(length), 9101);
+    return new ArrayBufferCtor(stagingBuffer.buffer, 0, length);
 }
 
 export function WebGLCmdFuncCopyBuffersToTexture (
@@ -2825,7 +2768,9 @@ export function WebGLCmdFuncCopyBuffersToTexture (
             let pixels: ArrayBufferView;
             const buffer = buffers[n++];
             if (stride.width === extent.width && stride.height === extent.height) {
-                pixels = new ArrayBufferCtor(buffer.buffer, buffer.byteOffset + region.buffOffset);
+                const length = FormatSize(gpuTexture.format, destWidth, destHeight, 1) / ArrayBufferCtor.BYTES_PER_ELEMENT;
+                assertID(Number.isInteger(length), 9101);
+                pixels = new ArrayBufferCtor(buffer.buffer, buffer.byteOffset + region.buffOffset, length);
             } else {
                 pixels = pixelBufferPick(buffer, gpuTexture.format, region.buffOffset, stride, extent);
             }
@@ -2872,7 +2817,9 @@ export function WebGLCmdFuncCopyBuffersToTexture (
                 let pixels: ArrayBufferView;
                 const buffer = buffers[n++];
                 if (stride.width === extent.width && stride.height === extent.height) {
-                    pixels = new ArrayBufferCtor(buffer.buffer, buffer.byteOffset + region.buffOffset);
+                    const length = FormatSize(gpuTexture.format, destWidth, destHeight, 1) / ArrayBufferCtor.BYTES_PER_ELEMENT;
+                    assertID(Number.isInteger(length), 9101);
+                    pixels = new ArrayBufferCtor(buffer.buffer, buffer.byteOffset + region.buffOffset, length);
                 } else {
                     pixels = pixelBufferPick(buffer, gpuTexture.format, region.buffOffset, stride, extent);
                 }

@@ -22,7 +22,7 @@
  THE SOFTWARE.
 */
 
-import { SUPPORT_JIT, EDITOR, TEST, JSB } from 'internal:constants';
+import { SUPPORT_JIT, EDITOR, TEST, JSB, EDITOR_NOT_IN_PREVIEW } from 'internal:constants';
 import * as js from '../utils/js';
 import { CCClass } from './class';
 import { errorID, warnID } from '../platform/debug';
@@ -56,10 +56,6 @@ const IsScaleLocked = 1 << 18;
 const IsAnchorLocked = 1 << 19;
 const IsSizeLocked = 1 << 20;
 const IsPositionLocked = 1 << 21;
-
-// Distributed
-const IsReplicated = 1 << 22;
-export const IsClientLoad = 1 << 23;
 
 // var Hide = HideInGame | HideInEditor;
 // should not clone or serialize these flags
@@ -212,6 +208,11 @@ class CCObject implements EditorExtendableObject {
          * @private
          */
         this._objFlags = 0;
+
+        if (EDITOR) {
+            // See cocos/cocos-engine#15392
+            this[editorExtrasTag] = {};
+        }
     }
 
     // MEMBER
@@ -242,17 +243,6 @@ class CCObject implements EditorExtendableObject {
     }
     public get hideFlags () {
         return this._objFlags & CCObject.Flags.AllHideMasks;
-    }
-
-    public set replicated (value: boolean) {
-        if (value) {
-            this._objFlags |= IsReplicated;
-        } else {
-            this._objFlags &= ~IsReplicated;
-        }
-    }
-    public get replicated () {
-        return !!(this._objFlags & IsReplicated);
     }
 
     /**
@@ -377,7 +367,7 @@ class CCObject implements EditorExtendableObject {
         // issue: https://github.com/cocos/cocos-engine/issues/14643
         ((this as any)._onPreDestroy)?.();
 
-        if (!EDITOR || legacyCC.GAME_VIEW) {
+        if (!EDITOR_NOT_IN_PREVIEW) {
             /*Native properties cannot be reset by _destruct, because the native properties are hung on the prototype and
              *hasOwnProperty's detection cannot be passed.
              */
@@ -468,9 +458,13 @@ if (EDITOR) {
  */
 (prototype as any)._deserialize = null;
 
-CCClass.fastDefine('cc.Object', CCObject, { _name: '', _objFlags: 0, [editorExtrasTag]: {} });
-CCClass.Attr.setClassAttr(CCObject, editorExtrasTag, 'editorOnly', true);
-CCClass.Attr.setClassAttr(CCObject, 'replicated', 'visible', false);
+// See cocos/cocos-engine#15392
+if (EDITOR) {
+    CCClass.fastDefine('cc.Object', CCObject, { _name: '', _objFlags: 0, [editorExtrasTag]: {} });
+    CCClass.Attr.setClassAttr(CCObject, editorExtrasTag, 'editorOnly', true);
+} else {
+    CCClass.fastDefine('cc.Object', CCObject, { _name: '', _objFlags: 0 });
+}
 
 /**
  * Bit mask that controls object states.
@@ -607,9 +601,6 @@ declare namespace CCObject {
         IsScaleLocked,
         IsAnchorLocked,
         IsSizeLocked,
-
-        IsReplicated,
-        IsClientLoad,
     }
 
     // for @ccclass
@@ -684,7 +675,7 @@ declare const jsb: any;
 if (JSB) {
     copyAllProperties(CCObject, jsb.CCObject, ['prototype', 'length', 'name']);
     copyAllProperties(CCObject.prototype, jsb.CCObject.prototype,
-        ['constructor', 'name', 'hideFlags', 'replicated', 'isValid']);
+        ['constructor', 'name', 'hideFlags', 'isValid']);
 
     (CCObject as unknown as any) = jsb.CCObject;
 }

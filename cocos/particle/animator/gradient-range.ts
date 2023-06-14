@@ -23,9 +23,8 @@
 */
 
 import { ccclass, type, serializable, editable } from 'cc.decorator';
-import { EDITOR } from 'internal:constants';
-import { Color, Enum, cclegacy } from '../../core';
-import Gradient, { AlphaKey, ColorKey } from './gradient';
+import { EDITOR, EDITOR_NOT_IN_PREVIEW } from 'internal:constants';
+import { Color, Enum, Gradient, AlphaKey, ColorKey } from '../../core';
 import { Texture2D } from '../../asset/assets';
 import { PixelFormat, Filter, WrapMode } from '../../asset/assets/asset-enum';
 
@@ -61,6 +60,9 @@ const Mode = Enum({
     RandomColor: 4,
 });
 
+const tempColor = new Color();
+const tempColor2 = new Color();
+
 /**
  * @en
  * GradientRange is a data structure which contains some constant colors or gradients.
@@ -82,7 +84,7 @@ export default class GradientRange {
     }
 
     set mode (m) {
-        if (EDITOR && !cclegacy.GAME_VIEW) {
+        if (EDITOR_NOT_IN_PREVIEW) {
             if (m === Mode.RandomColor) {
                 if (this.gradient.colorKeys.length === 0) {
                     this.gradient.colorKeys.push(new ColorKey());
@@ -168,11 +170,11 @@ export default class GradientRange {
             Color.lerp(this._color, this.colorMin, this.colorMax, rndRatio);
             return this._color;
         case Mode.RandomColor:
-            return this.gradient.randomColor();
+            return this.gradient.getRandomColor(this._color);
         case Mode.Gradient:
-            return this.gradient.evaluate(time);
+            return this.gradient.evaluateFast(this._color, time);
         case Mode.TwoGradients:
-            Color.lerp(this._color, this.gradientMin.evaluate(time), this.gradientMax.evaluate(time), rndRatio);
+            Color.lerp(this._color, this.gradientMin.evaluateFast(tempColor, time), this.gradientMax.evaluateFast(tempColor2, time), rndRatio);
             return this._color;
         default:
             return this.color;
@@ -194,11 +196,11 @@ function evaluateGradient (gr: GradientRange, time: number, index: number) {
     case Mode.TwoColors:
         return index === 0 ? gr.colorMin : gr.colorMax;
     case Mode.RandomColor:
-        return gr.gradient.randomColor();
+        return gr.gradient.getRandomColor(tempColor);
     case Mode.Gradient:
-        return gr.gradient.evaluate(time);
+        return gr.gradient.evaluateFast(tempColor, time);
     case Mode.TwoGradients:
-        return index === 0 ? gr.gradientMin.evaluate(time) : gr.gradientMax.evaluate(time);
+        return index === 0 ? gr.gradientMin.evaluateFast(tempColor, time) : gr.gradientMax.evaluateFast(tempColor, time);
     default:
         return gr.color;
     }

@@ -194,6 +194,7 @@ module.exports = {
             wrapModeTTip: '像素对纹理在 T（V）方向上的映射模式',
             modeWarn:
                 '警告：WebGL 1.0 平台不支持非 2 次幂贴图的 Repeat 过滤模式，运行时会自动改为 Clamp 模式，这会使材质的 tilingOffset 等属性完全失效。',
+            filterDiffenent: 'Filter 设置与 {atlasFile} 中的配置不符，可能无法生效。',
         },
         fbx: {
             browse: '更换贴图',
@@ -285,6 +286,9 @@ module.exports = {
                     name: '跳过验证',
                     title: '跳过对模型文件的验证。',
                 },
+                mountAllAnimationsOnPrefab: {
+                    name: '挂载全部动画到预制体',
+                },
             },
             addEvent: {
                 shouldSave: '新建的 Clip 需要先提交修改后，才能添加/编辑事件',
@@ -316,6 +320,10 @@ module.exports = {
                 title:
                     '标识此模型中的所有网格的数据是否可被读写，此接口只对静态网格资源生效，<br> ' +
                     '若不勾选，网格数据被提交到 GPU 后会被自动释放。<br>',
+            },
+            addVertexColor: {
+                name: '填充顶点色',
+                title: '如果模型没有顶点颜色属性，添加颜色属性，填充为白色。',
             },
             meshOptimizer: {
                 name: 'Mesh 优化',
@@ -417,6 +425,19 @@ module.exports = {
                 name: '材质智能转换',
                 title: '将 DCC 材质转化为引擎材质, 并匹对 DCC 材质的光照模型',
                 warn: '项目设置里的模型配置 "材质智能转换" 已关闭，请启用此项功能来修改模型级别设置。',
+            },
+            animationSetting: {
+                additive: {
+                    header: '加性动画导入设置',
+                    enabled: {
+                        label: '导入为加性',
+                        tooltip: '勾选后，该动画将被导入为加性动画。',
+                    },
+                    refClip: {
+                        label: '参考剪辑',
+                        tooltip: '若设置，将参考该动画第 0 帧的姿势计算加性动画；否则，则将参考第动画本身第 0 帧的姿势进行计算。',
+                    },
+                },
             },
         },
         textureCube: {

@@ -22,15 +22,17 @@
  THE SOFTWARE.
 */
 
+import { DEBUG } from 'internal:constants';
 import { Component } from '../../scene-graph/component';
 import { AnimationGraph } from './animation-graph';
 import type { AnimationGraphRunTime } from './animation-graph';
-import { _decorator, assertIsNonNullable, assertIsTrue } from '../../core';
+import { EventTarget, _decorator, assertIsNonNullable, assertIsTrue, warn } from '../../core';
 import { AnimationGraphEval } from './graph-eval';
-import type { MotionStateStatus, TransitionStatus, ClipStatus, ReadonlyClipOverrideMap } from './graph-eval';
-import { Value } from './variable';
+import type { MotionStateStatus, TransitionStatus, ClipStatus } from './state-machine/state-machine-eval';
+import { PrimitiveValue, Value } from './variable';
 import { AnimationGraphVariant, AnimationGraphVariantRunTime } from './animation-graph-variant';
 import { AnimationGraphLike } from './animation-graph-like';
+import type { ReadonlyClipOverrideMap } from './clip-overriding';
 
 const { ccclass, menu, type, serializable, editable, formerlySerializedAs } = _decorator;
 
@@ -100,7 +102,12 @@ export class AnimationController extends Component {
                 assertIsTrue(graph instanceof AnimationGraph);
                 originalGraph = graph;
             }
-            const graphEval = new AnimationGraphEval(originalGraph, this.node, this, clipOverrides);
+            const graphEval = new AnimationGraphEval(
+                originalGraph,
+                this.node,
+                this,
+                clipOverrides,
+            );
             this._graphEval = graphEval;
         }
     }
@@ -142,7 +149,24 @@ export class AnimationController extends Component {
      * animationController.setValue('attack', true);
      * ```
      */
-    public setValue (name: string, value: Value) {
+    public setValue (name: string, value: PrimitiveValue) {
+        return this.setValue_experimental(name, value);
+    }
+
+    /**
+     * @zh 设置动画图实例中变量的值。
+     * @en Sets the value of the variable in the animation graph instance.
+     * @param name @en Variable's name. @zh 变量的名称。
+     * @param value @en Variable's value. @zh 变量的值。
+     * @example
+     * ```ts
+     * animationController.setValue('speed', 3.14);
+     * animationController.setValue('crouching', true);
+     * animationController.setValue('attack', true);
+     * ```
+     * @experimental
+     */
+    public setValue_experimental (name: string, value: Value) {
         const { _graphEval: graphEval } = this;
         assertIsNonNullable(graphEval);
         graphEval.setValue(name, value);
@@ -154,7 +178,26 @@ export class AnimationController extends Component {
      * @param name @en Variable's name. @zh 变量的名称。
      * @returns @en Variable's value. @zh 变量的值。
      */
-    public getValue (name: string) {
+    public getValue (name: string): PrimitiveValue | undefined {
+        const value = this.getValue_experimental(name);
+        if (typeof value === 'object') {
+            if (DEBUG) {
+                warn(`Obtaining variable "${name}" is not of primitive type, `
+                    + `which is currently supported experimentally and should be explicitly obtained through this.getValue_experimental()`);
+            }
+            return undefined;
+        } else {
+            return value;
+        }
+    }
+
+    /**
+     * @zh 获取动画图实例中变量的值。
+     * @en Gets the value of the variable in the animation graph instance.
+     * @param name @en Variable's name. @zh 变量的名称。
+     * @returns @en Variable's value. @zh 变量的值。
+     */
+    public getValue_experimental (name: string): Value | undefined {
         const { _graphEval: graphEval } = this;
         assertIsNonNullable(graphEval);
         return graphEval.getValue(name);
