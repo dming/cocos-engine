@@ -398,7 +398,7 @@
             "type": "boolean",
             "value": false,
             "internal": false,
-            "dynamic": true
+            "dynamic": false
         },
         "HTML5": {
             "comment": "Running in Web platform",

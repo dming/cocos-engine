@@ -21,7 +21,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
 */
-import { BUILD, EDITOR, PREVIEW } from 'internal:constants';
+import { BUILD, EDITOR, NODEJS, PREVIEW } from 'internal:constants';
 import { Asset } from '../assets/asset';
 import { error, cclegacy, macro } from '../../core';
 import packManager from './pack-manager';
@@ -62,14 +62,16 @@ function IsImageType (type: string) {
 
 export default function load (task: Task, done: ((err?: Error | null) => void)) {
     let firstTask = false;
-    // 对 task.input 进行修剪，不在支持的format应该剔除出去，比如image
-    const innput: RequestItem[] = [];
-    (task.input as RequestItem[]).forEach((item: RequestItem) => {
-        if (!IsImageType(item.ext)) {
-            innput.push(item);
-        }
-    });
-    task.input = innput;
+    if (NODEJS) {
+        // 对 task.input 进行修剪，不在支持的format应该剔除出去，比如image
+        const innput: RequestItem[] = [];
+        (task.input as RequestItem[]).forEach((item: RequestItem) => {
+            if (!IsImageType(item.ext)) {
+                innput.push(item);
+            }
+        });
+        task.input = innput;
+    }
 
     if (!task.progress) {
         task.progress = { finish: 0, total: task.input.length, canInvoke: true };

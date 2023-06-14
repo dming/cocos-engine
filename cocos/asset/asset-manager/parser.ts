@@ -22,7 +22,6 @@
  THE SOFTWARE.
 */
 
-import { NODEJS } from 'internal:constants';
 import { ImageAsset, IMemoryImageSource } from '../assets/image-asset';
 import { js } from '../../core';
 import Cache from './cache';
